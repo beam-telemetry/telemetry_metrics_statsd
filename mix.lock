@@ -1,0 +1,4 @@
+%{
+  "telemetry": {:hex, :telemetry, "0.3.0", "099a7f3ce31e4780f971b4630a3c22ec66d22208bc090fe33a2a3a6a67754a73", [:rebar3], [], "hexpm"},
+  "telemetry_metrics": {:git, "https://github.com/beam-telemetry/telemetry_metrics.git", "9348663fc66949940b51123368decd0ef3b91d7b", []},
+}
