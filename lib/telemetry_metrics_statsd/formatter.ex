@@ -23,7 +23,7 @@ defmodule TelemetryMetricsStatsd.Formatter do
   end
 
   defp format_metric_value(%Metrics.Counter{}, _value), do: "1|c"
-  defp format_metric_value(%Metrics.Distribution{}, value), do: "#{value}|t"
+  defp format_metric_value(%Metrics.Distribution{}, value), do: "#{value}|ms"
   defp format_metric_value(%Metrics.LastValue{}, value), do: "#{value}|g"
   defp format_metric_value(%Metrics.Sum{}, value), do: "+#{value}|g"
 end

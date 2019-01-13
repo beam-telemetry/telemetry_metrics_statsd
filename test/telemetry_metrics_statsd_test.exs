@@ -61,9 +61,9 @@ defmodule TelemetryMetricsStatsdTest do
     :telemetry.execute([:http, :request], 200)
     :telemetry.execute([:http, :request], 198)
 
-    assert_reported(socket, "http.response_time:172|t")
-    assert_reported(socket, "http.response_time:200|t")
-    assert_reported(socket, "http.response_time:198|t")
+    assert_reported(socket, "http.response_time:172|ms")
+    assert_reported(socket, "http.response_time:200|ms")
+    assert_reported(socket, "http.response_time:198|ms")
   end
 
   test "StatsD metric name is based on metric name and tags" do
@@ -104,11 +104,11 @@ defmodule TelemetryMetricsStatsdTest do
     :telemetry.execute([:http, :request], 198)
 
     assert_reported(socket, "http.requests:1|c")
-    assert_reported(socket, "http.response_time:172|t")
+    assert_reported(socket, "http.response_time:172|ms")
     assert_reported(socket, "http.requests:1|c")
-    assert_reported(socket, "http.response_time:200|t")
+    assert_reported(socket, "http.response_time:200|ms")
     assert_reported(socket, "http.requests:1|c")
-    assert_reported(socket, "http.response_time:198|t")
+    assert_reported(socket, "http.response_time:198|ms")
   end
 
   defp given_udp_port_opened() do
