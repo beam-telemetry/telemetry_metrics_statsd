@@ -1,36 +1,82 @@
 defmodule TelemetryMetricsStatsd.EventHandler do
   @moduledoc false
 
-  @spec attach([Telemetry.Metrics.t()], reporter :: pid()) :: :ok
+  alias Telemetry.Metrics
+  alias TelemetryMetricsStatsd.Formatter
+
+  @spec attach([Metrics.t()], reporter :: pid()) :: [:telemetry.handler_id()]
   def attach(metrics, reporter) do
-    for metric <- metrics do
+    metrics_by_event = Enum.group_by(metrics, & &1.event_name)
+
+    for {event_name, metrics} <- metrics_by_event do
+      handler_id = handler_id(event_name, reporter)
+
       :ok =
-        :telemetry.attach(handler_id(metric, reporter), metric.event_name, &handle_event/4, %{
-          metric_name: metric.name,
-          metadata_fun: metric.metadata,
-          reporter: reporter
+        :telemetry.attach(handler_id, event_name, &handle_event/4, %{
+          reporter: reporter,
+          metrics: metrics
         })
+
+      handler_id
+    end
+  end
+
+  @spec detach([:telemetry.handler_id()]) :: :ok
+  def detach(handler_ids) do
+    for handler_id <- handler_ids do
+      :telemetry.detach(handler_id)
     end
 
     :ok
   end
 
-  @spec detach([Telemetry.Metrics.t()], reporter :: pid()) :: :ok
-  def detach(metrics, reporter) do
-    for metric <- metrics do
-      :telemetry.detach(handler_id(metric, reporter))
+  defp handle_event(_event, measurements, metadata, %{reporter: reporter, metrics: metrics}) do
+    payload =
+      for metric <- metrics do
+        case fetch_measurement(metric, measurements) do
+          {:ok, value} ->
+            # The order of tags needs to be preserved so that the final metric name is built correctly.
+            final_metadata = metric.metadata.(metadata)
+            tags = Enum.map(metric.tags, &{&1, Map.fetch!(final_metadata, &1)})
+            Formatter.format(metric, value, tags)
+
+          :error ->
+            :nopublish
+        end
+      end
+      |> Enum.filter(fn l -> l != :nopublish end)
+      |> Enum.join("\n")
+
+    TelemetryMetricsStatsd.report(reporter, payload)
+  end
+
+  @spec handler_id(:telemetry.event_name(), reporter :: pid) :: :telemetry.handler_id()
+  defp handler_id(event_name, reporter) do
+    {__MODULE__, reporter, event_name}
+  end
+
+  @spec fetch_measurement(Metrics.t(), :telemetry.event_measurements()) ::
+          {:ok, number()} | :error
+  defp fetch_measurement(%Metrics.Counter{}, _measurements) do
+    # For counter, we can ignore the measurements and just use 0.
+    {:ok, 0}
+  end
+
+  defp fetch_measurement(metric, measurements) do
+    value =
+      case metric.measurement do
+        fun when is_function(fun, 1) ->
+          fun.(measurements)
+
+        key ->
+          measurements[key]
+      end
+
+    if is_number(value) do
+      # The StasD metrics we implement support only numerical values.
+      {:ok, value}
+    else
+      :error
     end
-
-    :ok
-  end
-
-  defp handle_event(_event, measurements, metadata, config) do
-    final_metadata = config.metadata_fun.(metadata)
-    TelemetryMetricsStatsd.report(config.reporter, config.metric_name, measurements, final_metadata)
-  end
-
-  @spec handler_id(Telemetry.Metrics.t(), reporter :: pid) :: :telemetry.handler_id()
-  defp handler_id(metric, reporter) do
-    {__MODULE__, reporter, metric.__struct__, metric.name, metric.event_name}
   end
 end
