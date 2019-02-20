@@ -24,9 +24,9 @@ defmodule TelemetryMetricsStatsd.EventHandler do
     :ok
   end
 
-  defp handle_event(_event, value, metadata, config) do
+  defp handle_event(_event, measurements, metadata, config) do
     final_metadata = config.metadata_fun.(metadata)
-    TelemetryMetricsStatsd.report(config.reporter, config.metric_name, value, final_metadata)
+    TelemetryMetricsStatsd.report(config.reporter, config.metric_name, measurements, final_metadata)
   end
 
   @spec handler_id(Telemetry.Metrics.t(), reporter :: pid) :: :telemetry.handler_id()

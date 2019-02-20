@@ -3,13 +3,13 @@ defmodule TelemetryMetricsStatsdTest do
 
   test "counter metric is reported as StatsD counter with 1 as a value" do
     {socket, port} = given_udp_port_opened()
-    counter = given_counter([:http, :request], name: [:http, :requests])
+    counter = given_counter("http.requests", event_name: "http.request")
 
     start_reporter(metrics: [counter], port: port)
 
-    :telemetry.execute([:http, :request], 172)
-    :telemetry.execute([:http, :request], 200)
-    :telemetry.execute([:http, :request], 198)
+    :telemetry.execute([:http, :request], %{latency: 211})
+    :telemetry.execute([:http, :request], %{latency: 200})
+    :telemetry.execute([:http, :request], %{latency: 198})
 
     assert_reported(socket, "http.requests:1|c")
     assert_reported(socket, "http.requests:1|c")
@@ -18,69 +18,68 @@ defmodule TelemetryMetricsStatsdTest do
 
   test "sum metric is reported as StatsD gauge with +n value" do
     {socket, port} = given_udp_port_opened()
-    sum = given_sum([:payload, :received], name: [:payload, :received, :size])
+    sum = given_sum("http.request.payload_size")
 
     start_reporter(metrics: [sum], port: port)
 
-    :telemetry.execute([:payload, :received], 2001)
-    :telemetry.execute([:payload, :received], 1585)
-    :telemetry.execute([:payload, :received], 1872)
+    :telemetry.execute([:http, :request], %{payload_size: 2001})
+    :telemetry.execute([:http, :request], %{payload_size: 1585})
+    :telemetry.execute([:http, :request], %{payload_size: 1872})
 
-    assert_reported(socket, "payload.received.size:+2001|g")
-    assert_reported(socket, "payload.received.size:+1585|g")
-    assert_reported(socket, "payload.received.size:+1872|g")
+    assert_reported(socket, "http.request.payload_size:+2001|g")
+    assert_reported(socket, "http.request.payload_size:+1585|g")
+    assert_reported(socket, "http.request.payload_size:+1872|g")
   end
 
   test "last value metric is reported as StatsD gauge with absolute value" do
     {socket, port} = given_udp_port_opened()
-    last_value = given_last_value([:vm, :total_memory])
+    last_value = given_last_value("vm.memory.total")
 
     start_reporter(metrics: [last_value], port: port)
 
-    :telemetry.execute([:vm, :total_memory], 2001)
-    :telemetry.execute([:vm, :total_memory], 1585)
-    :telemetry.execute([:vm, :total_memory], 1872)
+    :telemetry.execute([:vm, :memory], %{total: 2001})
+    :telemetry.execute([:vm, :memory], %{total: 1585})
+    :telemetry.execute([:vm, :memory], %{total: 1872})
 
-    assert_reported(socket, "vm.total_memory:2001|g")
-    assert_reported(socket, "vm.total_memory:1585|g")
-    assert_reported(socket, "vm.total_memory:1872|g")
+    assert_reported(socket, "vm.memory.total:2001|g")
+    assert_reported(socket, "vm.memory.total:1585|g")
+    assert_reported(socket, "vm.memory.total:1872|g")
   end
 
   test "distribution metric is reported as StastD timer" do
     {socket, port} = given_udp_port_opened()
 
     dist =
-      given_distribution([:http, :request],
-        name: [:http, :response_time],
+      given_distribution("http.request.latency",
         buckets: [0, 100, 200, 300]
       )
 
     start_reporter(metrics: [dist], port: port)
 
-    :telemetry.execute([:http, :request], 172)
-    :telemetry.execute([:http, :request], 200)
-    :telemetry.execute([:http, :request], 198)
+    :telemetry.execute([:http, :request], %{latency: 172})
+    :telemetry.execute([:http, :request], %{latency: 200})
+    :telemetry.execute([:http, :request], %{latency: 198})
 
-    assert_reported(socket, "http.response_time:172|ms")
-    assert_reported(socket, "http.response_time:200|ms")
-    assert_reported(socket, "http.response_time:198|ms")
+    assert_reported(socket, "http.request.latency:172|ms")
+    assert_reported(socket, "http.request.latency:200|ms")
+    assert_reported(socket, "http.request.latency:198|ms")
   end
 
   test "StatsD metric name is based on metric name and tags" do
     {socket, port} = given_udp_port_opened()
 
     counter =
-      given_counter([:http, :request],
-        name: [:http, :requests],
+      given_counter("http.requests",
+      event_name: "http.request",
         metadata: :all,
         tags: [:method, :status]
       )
 
     start_reporter(metrics: [counter], port: port)
 
-    :telemetry.execute([:http, :request], 172, %{method: "GET", status: 200})
-    :telemetry.execute([:http, :request], 200, %{method: "POST", status: 201})
-    :telemetry.execute([:http, :request], 198, %{method: "GET", status: 404})
+    :telemetry.execute([:http, :request], %{latency: 172}, %{method: "GET", status: 200})
+    :telemetry.execute([:http, :request], %{latency: 200}, %{method: "POST", status: 201})
+    :telemetry.execute([:http, :request], %{latency: 198}, %{method: "GET", status: 404})
 
     assert_reported(socket, "http.requests.GET.200:1|c")
     assert_reported(socket, "http.requests.POST.201:1|c")
@@ -89,26 +88,25 @@ defmodule TelemetryMetricsStatsdTest do
 
   test "multiple metrics can be tracked at the same time" do
     {socket, port} = given_udp_port_opened()
-    counter = given_counter([:http, :request], name: [:http, :requests])
+    counter = given_counter("http.requests", event_name: "http.request")
 
     dist =
-      given_distribution([:http, :request],
-        name: [:http, :response_time],
+      given_distribution("http.request.latency",
         buckets: [0, 100, 200, 300]
       )
 
     start_reporter(metrics: [counter, dist], port: port)
 
-    :telemetry.execute([:http, :request], 172)
-    :telemetry.execute([:http, :request], 200)
-    :telemetry.execute([:http, :request], 198)
+    :telemetry.execute([:http, :request], %{latency: 172})
+    :telemetry.execute([:http, :request], %{latency: 200})
+    :telemetry.execute([:http, :request], %{latency: 198})
 
     assert_reported(socket, "http.requests:1|c")
-    assert_reported(socket, "http.response_time:172|ms")
+    assert_reported(socket, "http.request.latency:172|ms")
     assert_reported(socket, "http.requests:1|c")
-    assert_reported(socket, "http.response_time:200|ms")
+    assert_reported(socket, "http.request.latency:200|ms")
     assert_reported(socket, "http.requests:1|c")
-    assert_reported(socket, "http.response_time:198|ms")
+    assert_reported(socket, "http.request.latency:198|ms")
   end
 
   defp given_udp_port_opened() do
