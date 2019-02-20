@@ -109,6 +109,21 @@ defmodule TelemetryMetricsStatsdTest do
     assert_reported(socket, "http.request.latency:198|ms")
   end
 
+  test "measurement function is taken into account when getting the value for the metric" do
+    {socket, port} = given_udp_port_opened()
+    last_value = given_last_value("vm.memory.total", measurement: fn m -> m.total * 2 end)
+
+    start_reporter(metrics: [last_value], port: port)
+
+    :telemetry.execute([:vm, :memory], %{total: 2001})
+    :telemetry.execute([:vm, :memory], %{total: 1585})
+    :telemetry.execute([:vm, :memory], %{total: 1872})
+
+    assert_reported(socket, "vm.memory.total:4002|g")
+    assert_reported(socket, "vm.memory.total:3170|g")
+    assert_reported(socket, "vm.memory.total:3744|g")
+  end
+
   defp given_udp_port_opened() do
     {:ok, socket} = :gen_udp.open(0, [:binary, active: false])
     {:ok, port} = :inet.port(socket)
