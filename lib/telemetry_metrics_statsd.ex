@@ -12,10 +12,11 @@ defmodule TelemetryMetricsStatsd do
 
   use GenServer
 
+  alias Telemetry.Metrics
   alias TelemetryMetricsStatsd.{EventHandler, Formatter, UDP}
 
   @type option ::
-          {:port, :inet.port_number()} | {:host, String.t()} | {:metrics, [Telemetry.Metrics.t()]}
+          {:port, :inet.port_number()} | {:host, String.t()} | {:metrics, [Metrics.t()]}
   @type options :: [option]
 
   @default_port 8125
@@ -48,7 +49,7 @@ defmodule TelemetryMetricsStatsd do
   @spec report(
           pid(),
           Telemetry.Metrics.normalized_metric_name(),
-          :telemetry.event_value(),
+          :telemetry.event_measurements(),
           :telemetry.event_metadata()
         ) :: :ok
   def report(reporter, metric_name, event_value, metadata) do
@@ -74,19 +75,26 @@ defmodule TelemetryMetricsStatsd do
   end
 
   @impl true
-  def handle_call({:report, _metric_name, _value, _metadata} = report_data, _from, state) do
+  def handle_call({:report, _metric_name, _measurements, _metadata} = report_data, _from, state) do
     GenServer.cast(self(), report_data)
     {:reply, :ok, state}
   end
 
   @impl true
-  def handle_cast({:report, metric_name, value, metadata}, state) do
+  def handle_cast({:report, metric_name, measurements, metadata}, state) do
     metric = Map.fetch!(state.metrics, metric_name)
 
-    # The order of tags needs to be preserved so that the final metric name is built correctly.
-    tags = Enum.map(metric.tags, &{&1, Map.fetch!(metadata, &1)})
-    payload = Formatter.format(metric, value, tags)
-    :ok = UDP.send(state.udp, payload)
+    case fetch_measurement(metric, measurements) do
+      {:ok, value} ->
+        # The order of tags needs to be preserved so that the final metric name is built correctly.
+        tags = Enum.map(metric.tags, &{&1, Map.fetch!(metadata, &1)})
+        payload = Formatter.format(metric, value, tags)
+        :ok = UDP.send(state.udp, payload)
+
+      :error ->
+        :ok
+    end
+
     {:noreply, state}
   end
 
@@ -97,5 +105,29 @@ defmodule TelemetryMetricsStatsd do
     |> EventHandler.detach(self())
 
     :ok
+  end
+
+  @spec fetch_measurement(Metrics.t(), :telemetry.event_measurements()) ::
+          {:ok, number()} | :error
+  defp fetch_measurement(%Metrics.Counter{}, _measurements) do
+    # For counter, we can ignore the measurements and just use 0.
+    {:ok, 0}
+  end
+  defp fetch_measurement(metric, measurements) do
+    value =
+      case metric.measurement do
+        fun when is_function(fun, 1) ->
+          fun.(measurements)
+
+        key ->
+          measurements[key]
+      end
+
+    if is_number(value) do
+      # The StasD metrics we implement support only numerical values.
+      {:ok, value}
+    else
+      :error
+    end
   end
 end
