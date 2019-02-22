@@ -13,7 +13,7 @@ defmodule TelemetryMetricsStatsd do
   use GenServer
 
   alias Telemetry.Metrics
-  alias TelemetryMetricsStatsd.{EventHandler, Formatter, UDP}
+  alias TelemetryMetricsStatsd.{EventHandler, UDP}
 
   @type option ::
           {:port, :inet.port_number()} | {:host, String.t()} | {:metrics, [Metrics.t()]}
@@ -48,13 +48,11 @@ defmodule TelemetryMetricsStatsd do
   @doc false
   @spec report(
           pid(),
-          Telemetry.Metrics.normalized_metric_name(),
-          :telemetry.event_measurements(),
-          :telemetry.event_metadata()
+          payload :: binary()
         ) :: :ok
-  def report(reporter, metric_name, event_value, metadata) do
+  def report(reporter, payload) do
     # Use call to make sure that the reporter is alive.
-    GenServer.call(reporter, {:report, metric_name, event_value, metadata})
+    GenServer.call(reporter, {:report, payload})
   end
 
   @impl true
@@ -65,9 +63,8 @@ defmodule TelemetryMetricsStatsd do
 
     case UDP.open(host, port) do
       {:ok, udp} ->
-        EventHandler.attach(metrics, self())
-        metrics_map = metrics |> Enum.map(&{&1.name, &1}) |> Enum.into(%{})
-        {:ok, %{udp: udp, metrics: metrics_map}}
+        handler_ids = EventHandler.attach(metrics, self())
+        {:ok, %{udp: udp, handler_ids: handler_ids}}
 
       {:error, reason} ->
         {:error, {:udp_open_failed, reason}}
@@ -75,59 +72,21 @@ defmodule TelemetryMetricsStatsd do
   end
 
   @impl true
-  def handle_call({:report, _metric_name, _measurements, _metadata} = report_data, _from, state) do
+  def handle_call({:report, _payload} = report_data, _from, state) do
     GenServer.cast(self(), report_data)
     {:reply, :ok, state}
   end
 
   @impl true
-  def handle_cast({:report, metric_name, measurements, metadata}, state) do
-    metric = Map.fetch!(state.metrics, metric_name)
-
-    case fetch_measurement(metric, measurements) do
-      {:ok, value} ->
-        # The order of tags needs to be preserved so that the final metric name is built correctly.
-        tags = Enum.map(metric.tags, &{&1, Map.fetch!(metadata, &1)})
-        payload = Formatter.format(metric, value, tags)
-        :ok = UDP.send(state.udp, payload)
-
-      :error ->
-        :ok
-    end
-
+  def handle_cast({:report, payload}, state) do
+    :ok = UDP.send(state.udp, payload)
     {:noreply, state}
   end
 
   @impl true
   def terminate(_reason, state) do
-    state.metrics
-    |> Map.values()
-    |> EventHandler.detach(self())
+    EventHandler.detach(state.handler_ids)
 
     :ok
-  end
-
-  @spec fetch_measurement(Metrics.t(), :telemetry.event_measurements()) ::
-          {:ok, number()} | :error
-  defp fetch_measurement(%Metrics.Counter{}, _measurements) do
-    # For counter, we can ignore the measurements and just use 0.
-    {:ok, 0}
-  end
-  defp fetch_measurement(metric, measurements) do
-    value =
-      case metric.measurement do
-        fun when is_function(fun, 1) ->
-          fun.(measurements)
-
-        key ->
-          measurements[key]
-      end
-
-    if is_number(value) do
-      # The StasD metrics we implement support only numerical values.
-      {:ok, value}
-    else
-      :error
-    end
   end
 end
