@@ -1,6 +1,8 @@
 defmodule TelemetryMetricsStatsdTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   test "counter metric is reported as StatsD counter with 1 as a value" do
     {socket, port} = given_udp_port_opened()
     counter = given_counter("http.requests", event_name: "http.request")
@@ -134,6 +136,47 @@ defmodule TelemetryMetricsStatsdTest do
       "http.request.latency:198|ms\n" <>
         "http.request.payload_size:+1021|g"
     )
+  end
+
+  describe "UDP error handling" do
+    @tag :error_handling
+    test "notifying a UDP error logs an error" do
+      reporter = start_reporter(metrics: [])
+      udp = TelemetryMetricsStatsd.get_udp(reporter)
+
+      assert capture_log(fn ->
+               TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
+               # Can we do better here? We could use `call` instead of `cast` for reporting socket
+               # errors.
+               Process.sleep(100)
+             end) =~ ~r/\[error\] Failed to publish metrics over UDP: :closed/
+    end
+
+    test "notifying a UDP error for the same socket multiple times generates only one log" do
+      reporter = start_reporter(metrics: [])
+      udp = TelemetryMetricsStatsd.get_udp(reporter)
+
+      assert capture_log(fn ->
+               TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
+               Process.sleep(100)
+             end) =~ ~r/\[error\] Failed to publish metrics over UDP: :closed/
+
+      refute capture_log(fn ->
+               TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
+               Process.sleep(100)
+             end) == ""
+    end
+
+    @tag :capture_log
+    test "notifying a UDP error and fetching a socket returns a new socket" do
+      reporter = start_reporter(metrics: [])
+      udp = TelemetryMetricsStatsd.get_udp(reporter)
+
+      TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
+      new_udp = TelemetryMetricsStatsd.get_udp(reporter)
+
+      assert new_udp != udp
+    end
   end
 
   defp given_udp_port_opened() do

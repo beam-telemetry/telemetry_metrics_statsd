@@ -12,6 +12,8 @@ defmodule TelemetryMetricsStatsd do
 
   use GenServer
 
+  require Logger
+
   alias Telemetry.Metrics
   alias TelemetryMetricsStatsd.{EventHandler, UDP}
 
@@ -45,14 +47,14 @@ defmodule TelemetryMetricsStatsd do
     GenServer.start_link(__MODULE__, options)
   end
 
-  @doc false
-  @spec report(
-          pid(),
-          payload :: binary()
-        ) :: :ok
-  def report(reporter, payload) do
-    # Use call to make sure that the reporter is alive.
-    GenServer.call(reporter, {:report, payload})
+  @spec get_udp(pid()) :: UDP.t()
+  def get_udp(reporter) do
+    GenServer.call(reporter, :get_udp)
+  end
+
+  @spec udp_error(pid(), UDP.t(), reason :: term) :: :ok
+  def udp_error(reporter, udp, reason) do
+    GenServer.cast(reporter, {:udp_error, udp, reason})
   end
 
   @impl true
@@ -64,7 +66,7 @@ defmodule TelemetryMetricsStatsd do
     case UDP.open(host, port) do
       {:ok, udp} ->
         handler_ids = EventHandler.attach(metrics, self())
-        {:ok, %{udp: udp, handler_ids: handler_ids}}
+        {:ok, %{udp: udp, handler_ids: handler_ids, host: host, port: port}}
 
       {:error, reason} ->
         {:error, {:udp_open_failed, reason}}
@@ -72,15 +74,20 @@ defmodule TelemetryMetricsStatsd do
   end
 
   @impl true
-  def handle_call({:report, _payload} = report_data, _from, state) do
-    GenServer.cast(self(), report_data)
-    {:reply, :ok, state}
+  def handle_call(:get_udp, _from, state) do
+    {:reply, state.udp, state}
   end
 
   @impl true
-  def handle_cast({:report, payload}, state) do
-    :ok = UDP.send(state.udp, payload)
-    {:noreply, state}
+  def handle_cast({:udp_error, udp, reason}, %{udp: udp} = state) do
+    Logger.error "Failed to publish metrics over UDP: #{inspect reason}"
+    case UDP.open(state.host, state.port) do
+      {:ok, udp} ->
+        {:noreply, %{state | udp: udp}}
+      {:error, reason} ->
+        Logger.error "Failed to reopen UDP socket: #{inspect reason}"
+        {:stop, {:udp_open_failed, reason}, state}
+    end
   end
 
   @impl true
