@@ -2,7 +2,7 @@ defmodule TelemetryMetricsStatsd.EventHandler do
   @moduledoc false
 
   alias Telemetry.Metrics
-  alias TelemetryMetricsStatsd.Formatter
+  alias TelemetryMetricsStatsd.{Formatter, UDP}
 
   @spec attach([Metrics.t()], reporter :: pid()) :: [:telemetry.handler_id()]
   def attach(metrics, reporter) do
@@ -26,7 +26,6 @@ defmodule TelemetryMetricsStatsd.EventHandler do
     for handler_id <- handler_ids do
       :telemetry.detach(handler_id)
     end
-
     :ok
   end
 
@@ -45,9 +44,10 @@ defmodule TelemetryMetricsStatsd.EventHandler do
         end
       end
       |> Enum.filter(fn l -> l != :nopublish end)
+      # TODO: chunk the packets per MTU size.
       |> Enum.join("\n")
 
-    TelemetryMetricsStatsd.report(reporter, payload)
+    publish_metrics(reporter, payload)
   end
 
   @spec handler_id(:telemetry.event_name(), reporter :: pid) :: :telemetry.handler_id()
@@ -73,10 +73,21 @@ defmodule TelemetryMetricsStatsd.EventHandler do
       end
 
     if is_number(value) do
-      # The StasD metrics we implement support only numerical values.
+      # The StatsD metrics we implement support only numerical values.
       {:ok, value}
     else
       :error
+    end
+  end
+
+  @spec publish_metrics(pid(), binary()) :: :ok
+  defp publish_metrics(reporter, payload) do
+    udp = TelemetryMetricsStatsd.get_udp(reporter)
+    case UDP.send(udp, payload) do
+      :ok ->
+        :ok
+      {:error, reason} ->
+        TelemetryMetricsStatsd.udp_error(reporter, udp, reason)
     end
   end
 end
