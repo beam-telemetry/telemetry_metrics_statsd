@@ -41,8 +41,8 @@ defmodule TelemetryMetricsStatsd.EventHandler do
         case fetch_measurement(metric, measurements) do
           {:ok, value} ->
             # The order of tags needs to be preserved so that the final metric name is built correctly.
-            final_metadata = metric.metadata.(metadata)
-            tags = Enum.map(metric.tags, &{&1, Map.fetch!(final_metadata, &1)})
+            tag_values = metric.tag_values.(metadata)
+            tags = Enum.map(metric.tags, &{&1, Map.fetch!(tag_values, &1)})
             Formatter.format(metric, value, tags)
 
           :error ->
