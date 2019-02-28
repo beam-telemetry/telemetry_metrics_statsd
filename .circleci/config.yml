@@ -44,7 +44,7 @@ orbs:
                 - deps-<<parameters.elixir>>-<<parameters.otp>>
           - run: mix deps.get
           - run: mix coveralls.json
-          - run: mix dialyzer
+          - run: mix dialyzer --halt-exit-status
           - run:
               name: Install curl
               command: apk add --no-cache curl
