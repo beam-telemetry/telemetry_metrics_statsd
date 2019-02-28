@@ -7,7 +7,9 @@ defmodule TelemetryMetricsStatsd.MixProject do
       version: "0.1.0",
       elixir: "~> 1.5",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      preferred_cli_env: preferred_cli_env(),
+      deps: deps(),
+      test_coverage: [tool: ExCoveralls]
     ]
   end
 
@@ -17,10 +19,20 @@ defmodule TelemetryMetricsStatsd.MixProject do
     ]
   end
 
+  defp preferred_cli_env do
+    [
+      docs: :docs,
+      dialyzer: :test,
+      "coveralls.json": :test
+    ]
+  end
+
   defp deps do
     [
       {:telemetry, "~> 0.4"},
-      {:telemetry_metrics, github: "beam-telemetry/telemetry_metrics"}
+      {:telemetry_metrics, github: "beam-telemetry/telemetry_metrics"},
+      {:dialyxir, "~> 1.0.0-rc.3", only: :test, runtime: false},
+      {:excoveralls, "~> 0.10.0", only: :test, runtime: false}
     ]
   end
 end
