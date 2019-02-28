@@ -138,6 +138,33 @@ defmodule TelemetryMetricsStatsdTest do
     )
   end
 
+  test "too big payloads produced by single event are broken into multiple UDP datagrams" do
+    {socket, port} = given_udp_port_opened()
+
+    metrics = [
+      given_counter("first.counter", event_name: "http.request"),
+      given_counter("second.counter", event_name: "http.request"),
+      given_counter("third.counter", event_name: "http.request"),
+      given_counter("fourth.counter", event_name: "http.request")
+    ]
+
+    start_reporter(metrics: metrics, port: port, mtu: 40)
+
+    :telemetry.execute([:http, :request], %{latency: 172, payload_size: 121})
+
+    assert_reported(
+      socket,
+      "first.counter:1|c\n" <>
+        "second.counter:1|c"
+    )
+
+    assert_reported(
+      socket,
+      "third.counter:1|c\n" <>
+        "fourth.counter:1|c"
+    )
+  end
+
   describe "UDP error handling" do
     test "notifying a UDP error logs an error" do
       reporter = start_reporter(metrics: [])

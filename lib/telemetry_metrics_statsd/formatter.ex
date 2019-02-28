@@ -9,9 +9,10 @@ defmodule TelemetryMetricsStatsd.Formatter do
           tags :: [
             {Telemetry.Metrics.tag(), term()}
           ]
-        ) :: iodata()
+        ) :: binary()
   def format(metric, value, tags) do
     [format_metric_name(metric.name, tags), ?:, format_metric_value(metric, value)]
+    |> :erlang.iolist_to_binary()
   end
 
   defp format_metric_name(metric_name, tags) do
