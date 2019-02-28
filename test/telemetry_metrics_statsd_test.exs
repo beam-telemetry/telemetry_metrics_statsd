@@ -139,7 +139,6 @@ defmodule TelemetryMetricsStatsdTest do
   end
 
   describe "UDP error handling" do
-    @tag :error_handling
     test "notifying a UDP error logs an error" do
       reporter = start_reporter(metrics: [])
       udp = TelemetryMetricsStatsd.get_udp(reporter)
