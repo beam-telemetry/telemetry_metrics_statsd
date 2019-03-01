@@ -4,7 +4,9 @@ defmodule TelemetryMetricsStatsd.EventHandler do
   alias Telemetry.Metrics
   alias TelemetryMetricsStatsd.{Formatter, Packet, UDP}
 
-  @spec attach([Metrics.t()], reporter :: pid(), mtu :: non_neg_integer()) :: [:telemetry.handler_id()]
+  @spec attach([Metrics.t()], reporter :: pid(), mtu :: non_neg_integer()) :: [
+          :telemetry.handler_id()
+        ]
   def attach(metrics, reporter, mtu) do
     metrics_by_event = Enum.group_by(metrics, & &1.event_name)
 

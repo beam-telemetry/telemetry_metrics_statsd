@@ -10,28 +10,26 @@ defmodule TelemetryMetricsStatsd.PacketTest do
               # know that we won't be using the in the case of StatsD packets.
               binaries <- list_of(binary(min_length: 1, max_length: max_packet_size)),
               joiner <- binary() do
-
       packets = Packet.build_packets(binaries, max_packet_size, joiner)
 
-      for packet <- packets, reduce: binaries do
-        binaries ->
-          # each packet needs to be smaller or equal in size to the max_packet_size
-          packet_size = byte_size(packet)
-          assert packet_size <= max_packet_size
-          binaries = drop_packet_binaries(packet, joiner, binaries)
+      Enum.reduce(packets, binaries, fn packet, binaries ->
+        # each packet needs to be smaller or equal in size to the max_packet_size
+        packet_size = byte_size(packet)
+        assert packet_size <= max_packet_size
+        binaries = drop_packet_binaries(packet, joiner, binaries)
 
-          if binaries != [] do
-            # but the packet needs to be as big as possible
-            next_binary = Enum.at(binaries, 0)
+        if binaries != [] do
+          # but the packet needs to be as big as possible
+          next_binary = Enum.at(binaries, 0)
 
-            assert byte_size(packet <> joiner <> next_binary) > max_packet_size,
-                   "packets: #{inspect(packets)}, packet: #{inspect(packet)}, next_binary: #{
-                     inspect(next_binary)
-                   }, left binaries: #{inspect(binaries)}, packet_size: #{packet_size}"
-          end
+          assert byte_size(packet <> joiner <> next_binary) > max_packet_size,
+                 "packets: #{inspect(packets)}, packet: #{inspect(packet)}, next_binary: #{
+                   inspect(next_binary)
+                 }, left binaries: #{inspect(binaries)}, packet_size: #{packet_size}"
+        end
 
-          binaries
-      end
+        binaries
+      end)
     end
   end
 

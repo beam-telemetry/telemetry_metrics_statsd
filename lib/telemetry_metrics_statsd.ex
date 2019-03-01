@@ -97,6 +97,10 @@ defmodule TelemetryMetricsStatsd do
     end
   end
 
+  def handle_cast({:udp_error, _, _}, state) do
+    {:noreply, state}
+  end
+
   @impl true
   def terminate(_reason, state) do
     EventHandler.detach(state.handler_ids)

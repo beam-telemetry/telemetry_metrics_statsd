@@ -52,7 +52,8 @@ defmodule TelemetryMetricsStatsdTest do
     {socket, port} = given_udp_port_opened()
 
     dist =
-      given_distribution("http.request.latency",
+      given_distribution(
+        "http.request.latency",
         buckets: [0, 100, 200, 300]
       )
 
@@ -71,7 +72,8 @@ defmodule TelemetryMetricsStatsdTest do
     {socket, port} = given_udp_port_opened()
 
     counter =
-      given_counter("http.requests",
+      given_counter(
+        "http.requests",
         event_name: "http.request",
         metadata: :all,
         tags: [:method, :status]
@@ -107,7 +109,8 @@ defmodule TelemetryMetricsStatsdTest do
     {socket, port} = given_udp_port_opened()
 
     dist =
-      given_distribution("http.request.latency",
+      given_distribution(
+        "http.request.latency",
         buckets: [0, 100, 200, 300]
       )
 
@@ -121,20 +124,17 @@ defmodule TelemetryMetricsStatsdTest do
 
     assert_reported(
       socket,
-      "http.request.latency:172|ms\n" <>
-        "http.request.payload_size:+121|g"
+      "http.request.latency:172|ms\n" <> "http.request.payload_size:+121|g"
     )
 
     assert_reported(
       socket,
-      "http.request.latency:200|ms\n" <>
-        "http.request.payload_size:+64|g"
+      "http.request.latency:200|ms\n" <> "http.request.payload_size:+64|g"
     )
 
     assert_reported(
       socket,
-      "http.request.latency:198|ms\n" <>
-        "http.request.payload_size:+1021|g"
+      "http.request.latency:198|ms\n" <> "http.request.payload_size:+1021|g"
     )
   end
 
@@ -154,14 +154,12 @@ defmodule TelemetryMetricsStatsdTest do
 
     assert_reported(
       socket,
-      "first.counter:1|c\n" <>
-        "second.counter:1|c"
+      "first.counter:1|c\n" <> "second.counter:1|c"
     )
 
     assert_reported(
       socket,
-      "third.counter:1|c\n" <>
-        "fourth.counter:1|c"
+      "third.counter:1|c\n" <> "fourth.counter:1|c"
     )
   end
 
@@ -187,7 +185,7 @@ defmodule TelemetryMetricsStatsdTest do
                Process.sleep(100)
              end) =~ ~r/\[error\] Failed to publish metrics over UDP: :closed/
 
-      refute capture_log(fn ->
+      assert capture_log(fn ->
                TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
                Process.sleep(100)
              end) == ""
@@ -228,7 +226,8 @@ defmodule TelemetryMetricsStatsdTest do
   end
 
   defp start_reporter(options) do
-    start_supervised!({TelemetryMetricsStatsd, options})
+    {:ok, pid} = TelemetryMetricsStatsd.start_link(options)
+    pid
   end
 
   defp assert_reported(socket, expected_payload) do

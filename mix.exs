@@ -32,7 +32,7 @@ defmodule TelemetryMetricsStatsd.MixProject do
       {:telemetry, "~> 0.4"},
       {:telemetry_metrics, github: "beam-telemetry/telemetry_metrics"},
       {:stream_data, "~> 0.4", only: :test},
-      {:dialyxir, "~> 1.0.0-rc.3", only: :test, runtime: false},
+      {:dialyxir, "~> 0.5", only: :test, runtime: false},
       {:excoveralls, "~> 0.10.0", only: :test, runtime: false}
     ]
   end
