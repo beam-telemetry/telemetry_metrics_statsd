@@ -52,7 +52,8 @@ defmodule TelemetryMetricsStatsdTest do
     {socket, port} = given_udp_port_opened()
 
     dist =
-      given_distribution("http.request.latency",
+      given_distribution(
+        "http.request.latency",
         buckets: [0, 100, 200, 300]
       )
 
@@ -71,7 +72,8 @@ defmodule TelemetryMetricsStatsdTest do
     {socket, port} = given_udp_port_opened()
 
     counter =
-      given_counter("http.requests",
+      given_counter(
+        "http.requests",
         event_name: "http.request",
         metadata: :all,
         tags: [:method, :status]
@@ -107,7 +109,8 @@ defmodule TelemetryMetricsStatsdTest do
     {socket, port} = given_udp_port_opened()
 
     dist =
-      given_distribution("http.request.latency",
+      given_distribution(
+        "http.request.latency",
         buckets: [0, 100, 200, 300]
       )
 
@@ -121,25 +124,46 @@ defmodule TelemetryMetricsStatsdTest do
 
     assert_reported(
       socket,
-      "http.request.latency:172|ms\n" <>
-        "http.request.payload_size:+121|g"
+      "http.request.latency:172|ms\n" <> "http.request.payload_size:+121|g"
     )
 
     assert_reported(
       socket,
-      "http.request.latency:200|ms\n" <>
-        "http.request.payload_size:+64|g"
+      "http.request.latency:200|ms\n" <> "http.request.payload_size:+64|g"
     )
 
     assert_reported(
       socket,
-      "http.request.latency:198|ms\n" <>
-        "http.request.payload_size:+1021|g"
+      "http.request.latency:198|ms\n" <> "http.request.payload_size:+1021|g"
+    )
+  end
+
+  test "too big payloads produced by single event are broken into multiple UDP datagrams" do
+    {socket, port} = given_udp_port_opened()
+
+    metrics = [
+      given_counter("first.counter", event_name: "http.request"),
+      given_counter("second.counter", event_name: "http.request"),
+      given_counter("third.counter", event_name: "http.request"),
+      given_counter("fourth.counter", event_name: "http.request")
+    ]
+
+    start_reporter(metrics: metrics, port: port, mtu: 40)
+
+    :telemetry.execute([:http, :request], %{latency: 172, payload_size: 121})
+
+    assert_reported(
+      socket,
+      "first.counter:1|c\n" <> "second.counter:1|c"
+    )
+
+    assert_reported(
+      socket,
+      "third.counter:1|c\n" <> "fourth.counter:1|c"
     )
   end
 
   describe "UDP error handling" do
-    @tag :error_handling
     test "notifying a UDP error logs an error" do
       reporter = start_reporter(metrics: [])
       udp = TelemetryMetricsStatsd.get_udp(reporter)
@@ -161,7 +185,7 @@ defmodule TelemetryMetricsStatsdTest do
                Process.sleep(100)
              end) =~ ~r/\[error\] Failed to publish metrics over UDP: :closed/
 
-      refute capture_log(fn ->
+      assert capture_log(fn ->
                TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
                Process.sleep(100)
              end) == ""
@@ -202,7 +226,8 @@ defmodule TelemetryMetricsStatsdTest do
   end
 
   defp start_reporter(options) do
-    start_supervised!({TelemetryMetricsStatsd, options})
+    {:ok, pid} = TelemetryMetricsStatsd.start_link(options)
+    pid
   end
 
   defp assert_reported(socket, expected_payload) do

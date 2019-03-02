@@ -2,10 +2,12 @@ defmodule TelemetryMetricsStatsd.EventHandler do
   @moduledoc false
 
   alias Telemetry.Metrics
-  alias TelemetryMetricsStatsd.{Formatter, UDP}
+  alias TelemetryMetricsStatsd.{Formatter, Packet, UDP}
 
-  @spec attach([Metrics.t()], reporter :: pid()) :: [:telemetry.handler_id()]
-  def attach(metrics, reporter) do
+  @spec attach([Metrics.t()], reporter :: pid(), mtu :: non_neg_integer()) :: [
+          :telemetry.handler_id()
+        ]
+  def attach(metrics, reporter, mtu) do
     metrics_by_event = Enum.group_by(metrics, & &1.event_name)
 
     for {event_name, metrics} <- metrics_by_event do
@@ -14,7 +16,8 @@ defmodule TelemetryMetricsStatsd.EventHandler do
       :ok =
         :telemetry.attach(handler_id, event_name, &handle_event/4, %{
           reporter: reporter,
-          metrics: metrics
+          metrics: metrics,
+          mtu: mtu
         })
 
       handler_id
@@ -26,17 +29,22 @@ defmodule TelemetryMetricsStatsd.EventHandler do
     for handler_id <- handler_ids do
       :telemetry.detach(handler_id)
     end
+
     :ok
   end
 
-  defp handle_event(_event, measurements, metadata, %{reporter: reporter, metrics: metrics}) do
-    payload =
+  defp handle_event(_event, measurements, metadata, %{
+         reporter: reporter,
+         metrics: metrics,
+         mtu: mtu
+       }) do
+    packets =
       for metric <- metrics do
         case fetch_measurement(metric, measurements) do
           {:ok, value} ->
             # The order of tags needs to be preserved so that the final metric name is built correctly.
-            final_metadata = metric.metadata.(metadata)
-            tags = Enum.map(metric.tags, &{&1, Map.fetch!(final_metadata, &1)})
+            tag_values = metric.tag_values.(metadata)
+            tags = Enum.map(metric.tags, &{&1, Map.fetch!(tag_values, &1)})
             Formatter.format(metric, value, tags)
 
           :error ->
@@ -44,10 +52,9 @@ defmodule TelemetryMetricsStatsd.EventHandler do
         end
       end
       |> Enum.filter(fn l -> l != :nopublish end)
-      # TODO: chunk the packets per MTU size.
-      |> Enum.join("\n")
+      |> Packet.build_packets(mtu, "\n")
 
-    publish_metrics(reporter, payload)
+    publish_metrics(reporter, packets)
   end
 
   @spec handler_id(:telemetry.event_name(), reporter :: pid) :: :telemetry.handler_id()
@@ -80,14 +87,19 @@ defmodule TelemetryMetricsStatsd.EventHandler do
     end
   end
 
-  @spec publish_metrics(pid(), binary()) :: :ok
-  defp publish_metrics(reporter, payload) do
+  @spec publish_metrics(pid(), [binary()]) :: :ok
+  defp publish_metrics(reporter, packets) do
     udp = TelemetryMetricsStatsd.get_udp(reporter)
-    case UDP.send(udp, payload) do
-      :ok ->
-        :ok
-      {:error, reason} ->
-        TelemetryMetricsStatsd.udp_error(reporter, udp, reason)
-    end
+
+    Enum.reduce_while(packets, :cont, fn packet, :cont ->
+      case UDP.send(udp, packet) do
+        :ok ->
+          {:cont, :cont}
+
+        {:error, reason} ->
+          TelemetryMetricsStatsd.udp_error(reporter, udp, reason)
+          {:halt, :halt}
+      end
+    end)
   end
 end

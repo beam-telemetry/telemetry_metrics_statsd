@@ -18,10 +18,14 @@ defmodule TelemetryMetricsStatsd do
   alias TelemetryMetricsStatsd.{EventHandler, UDP}
 
   @type option ::
-          {:port, :inet.port_number()} | {:host, String.t()} | {:metrics, [Metrics.t()]}
+          {:port, :inet.port_number()}
+          | {:host, String.t()}
+          | {:metrics, [Metrics.t()]}
+          | {:mtu, non_neg_integer()}
   @type options :: [option]
 
   @default_port 8125
+  @default_mtu 512
 
   @doc """
   Reporter's child spec.
@@ -62,10 +66,11 @@ defmodule TelemetryMetricsStatsd do
     metrics = Keyword.fetch!(options, :metrics)
     port = Keyword.get(options, :port, @default_port)
     host = Keyword.get(options, :host, "localhost") |> to_charlist()
+    mtu = Keyword.get(options, :mtu, @default_mtu)
 
     case UDP.open(host, port) do
       {:ok, udp} ->
-        handler_ids = EventHandler.attach(metrics, self())
+        handler_ids = EventHandler.attach(metrics, self(), mtu)
         {:ok, %{udp: udp, handler_ids: handler_ids, host: host, port: port}}
 
       {:error, reason} ->
@@ -80,14 +85,20 @@ defmodule TelemetryMetricsStatsd do
 
   @impl true
   def handle_cast({:udp_error, udp, reason}, %{udp: udp} = state) do
-    Logger.error "Failed to publish metrics over UDP: #{inspect reason}"
+    Logger.error("Failed to publish metrics over UDP: #{inspect(reason)}")
+
     case UDP.open(state.host, state.port) do
       {:ok, udp} ->
         {:noreply, %{state | udp: udp}}
+
       {:error, reason} ->
-        Logger.error "Failed to reopen UDP socket: #{inspect reason}"
+        Logger.error("Failed to reopen UDP socket: #{inspect(reason)}")
         {:stop, {:udp_open_failed, reason}, state}
     end
+  end
+
+  def handle_cast({:udp_error, _, _}, state) do
+    {:noreply, state}
   end
 
   @impl true
