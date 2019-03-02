@@ -2,6 +2,7 @@ defmodule TelemetryMetricsStatsdTest do
   use ExUnit.Case, async: true
 
   import ExUnit.CaptureLog
+  import TelemetryMetricsStatsd.Test.WaitUntil
 
   test "counter metric is reported as StatsD counter with 1 as a value" do
     {socket, port} = given_udp_port_opened()
@@ -213,7 +214,7 @@ defmodule TelemetryMetricsStatsdTest do
       given_sum("http.request.payload_size")
     ]
 
-    reporter = start_reporter(metrics: metrics, port: port, prefix: "myapp")
+    start_reporter(metrics: metrics, port: port, prefix: "myapp")
 
     :telemetry.execute([:http, :request], %{latency: 200, current_memory: 200, payload_size: 200})
 
@@ -223,6 +224,63 @@ defmodule TelemetryMetricsStatsdTest do
         "myapp.http.request.current_memory:200|g\n" <>
         "myapp.http.request.payload_size:+200|g"
     )
+  end
+
+  @tag :capture_log
+  test "metrics are not sent when reporter receives an exit signal" do
+    {socket, port} = given_udp_port_opened()
+
+    reporter =
+      start_reporter(
+        metrics: [
+          given_counter("first.event.count"),
+          given_counter("second.event.count")
+        ],
+        port: port
+      )
+
+    Process.unlink(reporter)
+
+    # Make sure that event handlers are detached even if non-parent process sends an exit signal.
+    spawn(fn -> Process.exit(reporter, :some_reason) end)
+    wait_until(fn -> not Process.alive?(reporter) end)
+
+    assert :telemetry.list_handlers([:first, :event]) == []
+    assert :telemetry.list_handlers([:second, :event]) == []
+
+    :telemetry.execute([:first, :event], %{})
+    :telemetry.execute([:second, :event], %{})
+
+    refute_reported(socket)
+  end
+
+  test "metrics are not sent when reporter is shut down by its supervisor" do
+    {socket, port} = given_udp_port_opened()
+
+    metrics = [
+      given_counter("first.event.count"),
+      given_counter("second.event.count")
+    ]
+
+    {:ok, supervisor} =
+      Supervisor.start_link(
+        [
+          Supervisor.Spec.worker(TelemetryMetricsStatsd, [[metrics: metrics, port: port]])
+        ],
+        strategy: :one_for_one
+      )
+
+    Process.unlink(supervisor)
+
+    Supervisor.stop(supervisor, :shutdown)
+
+    assert :telemetry.list_handlers([:first, :event]) == []
+    assert :telemetry.list_handlers([:second, :event]) == []
+
+    :telemetry.execute([:first, :event], %{})
+    :telemetry.execute([:second, :event], %{})
+
+    refute_reported(socket)
   end
 
   defp given_udp_port_opened() do
@@ -256,5 +314,9 @@ defmodule TelemetryMetricsStatsdTest do
     expected_size = byte_size(expected_payload)
     {:ok, {_host, _port, payload}} = :gen_udp.recv(socket, expected_size)
     assert payload == expected_payload
+  end
+
+  defp refute_reported(socket) do
+    assert {:error, :timeout} = :gen_udp.recv(socket, 0, 1000)
   end
 end
