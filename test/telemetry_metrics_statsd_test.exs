@@ -203,6 +203,28 @@ defmodule TelemetryMetricsStatsdTest do
     end
   end
 
+  test "published metrics are prefixed with a provided prefix" do
+    {socket, port} = given_udp_port_opened()
+
+    metrics = [
+      given_counter("http.request.count"),
+      given_distribution("http.request.latency", buckets: [0, 100, 200]),
+      given_last_value("http.request.current_memory"),
+      given_sum("http.request.payload_size")
+    ]
+
+    reporter = start_reporter(metrics: metrics, port: port, prefix: "myapp")
+
+    :telemetry.execute([:http, :request], %{latency: 200, current_memory: 200, payload_size: 200})
+
+    assert_reported(socket,
+      "myapp.http.request.count:1|c\n" <>
+        "myapp.http.request.latency:200|ms\n" <>
+        "myapp.http.request.current_memory:200|g\n" <>
+        "myapp.http.request.payload_size:+200|g"
+    )
+  end
+
   defp given_udp_port_opened() do
     {:ok, socket} = :gen_udp.open(0, [:binary, active: false])
     {:ok, port} = :inet.port(socket)
@@ -221,7 +243,7 @@ defmodule TelemetryMetricsStatsdTest do
     Telemetry.Metrics.last_value(event_name, opts)
   end
 
-  defp given_distribution(event_name, opts \\ []) do
+  defp given_distribution(event_name, opts) do
     Telemetry.Metrics.distribution(event_name, opts)
   end
 

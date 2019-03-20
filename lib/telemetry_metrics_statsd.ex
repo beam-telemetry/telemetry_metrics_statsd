@@ -22,6 +22,7 @@ defmodule TelemetryMetricsStatsd do
           | {:host, String.t()}
           | {:metrics, [Metrics.t()]}
           | {:mtu, non_neg_integer()}
+          | {:prefix, String.t()}
   @type options :: [option]
 
   @default_port 8125
@@ -67,10 +68,11 @@ defmodule TelemetryMetricsStatsd do
     port = Keyword.get(options, :port, @default_port)
     host = Keyword.get(options, :host, "localhost") |> to_charlist()
     mtu = Keyword.get(options, :mtu, @default_mtu)
+    prefix = Keyword.get(options, :prefix)
 
     case UDP.open(host, port) do
       {:ok, udp} ->
-        handler_ids = EventHandler.attach(metrics, self(), mtu)
+        handler_ids = EventHandler.attach(metrics, self(), mtu, prefix)
         {:ok, %{udp: udp, handler_ids: handler_ids, host: host, port: port}}
 
       {:error, reason} ->

@@ -4,10 +4,10 @@ defmodule TelemetryMetricsStatsd.EventHandler do
   alias Telemetry.Metrics
   alias TelemetryMetricsStatsd.{Formatter, Packet, UDP}
 
-  @spec attach([Metrics.t()], reporter :: pid(), mtu :: non_neg_integer()) :: [
+  @spec attach([Metrics.t()], reporter :: pid(), mtu :: non_neg_integer(), prefix :: String.t | nil) :: [
           :telemetry.handler_id()
         ]
-  def attach(metrics, reporter, mtu) do
+  def attach(metrics, reporter, mtu, prefix) do
     metrics_by_event = Enum.group_by(metrics, & &1.event_name)
 
     for {event_name, metrics} <- metrics_by_event do
@@ -17,7 +17,8 @@ defmodule TelemetryMetricsStatsd.EventHandler do
         :telemetry.attach(handler_id, event_name, &handle_event/4, %{
           reporter: reporter,
           metrics: metrics,
-          mtu: mtu
+          mtu: mtu,
+          prefix: prefix
         })
 
       handler_id
@@ -36,7 +37,8 @@ defmodule TelemetryMetricsStatsd.EventHandler do
   defp handle_event(_event, measurements, metadata, %{
          reporter: reporter,
          metrics: metrics,
-         mtu: mtu
+         mtu: mtu,
+         prefix: prefix
        }) do
     packets =
       for metric <- metrics do
@@ -45,7 +47,7 @@ defmodule TelemetryMetricsStatsd.EventHandler do
             # The order of tags needs to be preserved so that the final metric name is built correctly.
             tag_values = metric.tag_values.(metadata)
             tags = Enum.map(metric.tags, &{&1, Map.fetch!(tag_values, &1)})
-            Formatter.format(metric, value, tags)
+            Formatter.format(prefix, metric, value, tags)
 
           :error ->
             :nopublish
