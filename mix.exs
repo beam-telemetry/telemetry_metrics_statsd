@@ -13,7 +13,9 @@ defmodule TelemetryMetricsStatsd.MixProject do
       preferred_cli_env: preferred_cli_env(),
       deps: deps(),
       dialyzer: [ignore_warnings: ".dialyzer_ignore"],
-      docs: docs()
+      docs: docs(),
+      description: description(),
+      package: package()
     ]
   end
 
@@ -35,7 +37,6 @@ defmodule TelemetryMetricsStatsd.MixProject do
 
   defp deps do
     [
-      {:telemetry, "~> 0.4"},
       {:telemetry_metrics, "~> 0.2"},
       {:stream_data, "~> 0.4", only: :test},
       {:dialyxir, "~> 0.5", only: :test, runtime: false},
@@ -47,8 +48,22 @@ defmodule TelemetryMetricsStatsd.MixProject do
     [
       main: "TelemetryMetricsStatsd",
       canonical: "http://hexdocs.pm/telemetry_metrics_statsd",
-      source_url: "https://github.com/beam-telemetry/telemetry_metrics",
+      source_url: "https://github.com/arkgil/telemetry_metrics_statsd",
       source_ref: "v#{@version}"
+    ]
+  end
+
+  defp description do
+    """
+    Telemetry.Metrics reporter for StastD-compatible metric servers
+    """
+  end
+
+  defp package do
+    [
+      maintainers: ["Arkadiusz Gil"],
+      licenses: ["MIT"],
+      links: %{"GitHub" => "https://github.com/arkgil/telemetry_metrics_statsd"}
     ]
   end
 end

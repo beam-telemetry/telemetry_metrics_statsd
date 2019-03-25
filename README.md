@@ -43,3 +43,23 @@ published metrics using the `:prefix` option.
 
 Note that the reporter doesn't aggregate metrics in-process - it sends metric updates to StatsD
 whenever a relevant Telemetry event is emitted.
+
+## Installation
+
+Just add the reporter to your dependencies in `mix.exs`:
+
+```elixir
+defp deps do
+  [
+    {:telemetry_metrics_statsd, "~> 0.1.0"}
+  ]
+end
+```
+
+## Copyright and License
+
+TelemetryMetricsStatsd is copyright (c) 2019 Arkadiusz Gil.
+
+TelemetryMetricsStatsd source code is released under MIT license.
+
+See [LICENSE](LICENSE) for more information.

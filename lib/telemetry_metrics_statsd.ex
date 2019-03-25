@@ -184,7 +184,7 @@ defmodule TelemetryMetricsStatsd do
     bytes. This value should not be greater than the actual MTU since this could lead to the data loss
     when the metrics are published. Defaults to `512`.
 
-  You can read more about all the options in the `TelemetryMetricsStastd` module documentation.
+  You can read more about all the options in the `TelemetryMetricsStatsd` module documentation.
 
   ## Example
 
