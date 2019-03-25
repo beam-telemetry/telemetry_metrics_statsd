@@ -72,6 +72,7 @@ defmodule TelemetryMetricsStatsd do
 
     case UDP.open(host, port) do
       {:ok, udp} ->
+        Process.flag(:trap_exit, true)
         handler_ids = EventHandler.attach(metrics, self(), mtu, prefix)
         {:ok, %{udp: udp, handler_ids: handler_ids, host: host, port: port}}
 
@@ -101,6 +102,11 @@ defmodule TelemetryMetricsStatsd do
 
   def handle_cast({:udp_error, _, _}, state) do
     {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:EXIT, _pid, reason}, state) do
+    {:stop, reason, state}
   end
 
   @impl true
