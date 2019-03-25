@@ -4,7 +4,12 @@ defmodule TelemetryMetricsStatsd.EventHandler do
   alias Telemetry.Metrics
   alias TelemetryMetricsStatsd.{Formatter, Packet, UDP}
 
-  @spec attach([Metrics.t()], reporter :: pid(), mtu :: non_neg_integer(), prefix :: String.t | nil) :: [
+  @spec attach(
+          [Metrics.t()],
+          reporter :: pid(),
+          mtu :: non_neg_integer(),
+          prefix :: String.t() | nil
+        ) :: [
           :telemetry.handler_id()
         ]
   def attach(metrics, reporter, mtu, prefix) do
@@ -54,9 +59,14 @@ defmodule TelemetryMetricsStatsd.EventHandler do
         end
       end
       |> Enum.filter(fn l -> l != :nopublish end)
-      |> Packet.build_packets(mtu, "\n")
 
-    publish_metrics(reporter, packets)
+    case packets do
+      [] ->
+        :ok
+
+      packets ->
+        publish_metrics(reporter, Packet.build_packets(packets, mtu, "\n"))
+    end
   end
 
   @spec handler_id(:telemetry.event_name(), reporter :: pid) :: :telemetry.handler_id()
@@ -81,11 +91,16 @@ defmodule TelemetryMetricsStatsd.EventHandler do
           measurements[key]
       end
 
-    if is_number(value) do
-      # The StatsD metrics we implement support only numerical values.
-      {:ok, value}
-    else
-      :error
+    cond do
+      is_float(value) ->
+        # The StatsD metrics we implement support only numerical values.
+        {:ok, round(value)}
+
+      is_integer(value) ->
+        {:ok, value}
+
+      true ->
+        :error
     end
   end
 

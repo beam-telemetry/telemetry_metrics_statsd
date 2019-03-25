@@ -283,6 +283,43 @@ defmodule TelemetryMetricsStatsdTest do
     refute_reported(socket)
   end
 
+  test "non-number measurement prevents the metric from being updated" do
+    {socket, port} = given_udp_port_opened()
+    sum = given_sum("my.metric", event_name: [:my, :event], measurement: :non_number)
+
+    start_reporter(metrics: [sum], port: port)
+
+    :telemetry.execute([:my, :event], %{non_number: :not_a_number})
+
+    refute_reported(socket)
+  end
+
+  test "negative sum metric measurement decreases the gauge's value" do
+    {socket, port} = given_udp_port_opened()
+    sum = given_sum("my.metric", event_name: [:my, :event], measurement: :number)
+
+    start_reporter(metrics: [sum], port: port)
+
+    :telemetry.execute([:my, :event], %{number: -1})
+
+    assert_reported(socket, "my.metric:-1|g")
+  end
+
+  test "float measurements are rounded to integers" do
+    {socket, port} = given_udp_port_opened()
+    sum = given_sum("my.metric", event_name: [:my, :event], measurement: :float)
+
+    start_reporter(metrics: [sum], port: port)
+
+    :telemetry.execute([:my, :event], %{float: 12.5})
+    :telemetry.execute([:my, :event], %{float: 13.1})
+    :telemetry.execute([:my, :event], %{float: -11.5})
+
+    assert_reported(socket, "my.metric:+13|g")
+    assert_reported(socket, "my.metric:+13|g")
+    assert_reported(socket, "my.metric:-12|g")
+  end
+
   defp given_udp_port_opened() do
     {:ok, socket} = :gen_udp.open(0, [:binary, active: false])
     {:ok, port} = :inet.port(socket)

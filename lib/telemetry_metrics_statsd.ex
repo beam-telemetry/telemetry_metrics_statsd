@@ -119,6 +119,8 @@ defmodule TelemetryMetricsStatsd do
   Since StatsD timers don't maintain a histogram of values, **distribution's `:buckets` option
   has no meaning in case of this reporter**.
 
+  > Note: all floating point measurements are rounded to the nearest integer.
+
   ## Prefixing metric names
 
   Since not all the StatsD implementations provide a proper tagging system, sometimes it's convenient
