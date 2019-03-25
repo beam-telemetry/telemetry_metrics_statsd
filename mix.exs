@@ -1,16 +1,19 @@
 defmodule TelemetryMetricsStatsd.MixProject do
   use Mix.Project
 
+  @version "0.1.0"
+
   def project do
     [
       app: :telemetry_metrics_statsd,
-      version: "0.1.0",
+      version: @version,
       elixir: "~> 1.5",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
       preferred_cli_env: preferred_cli_env(),
       deps: deps(),
-      dialyzer: [ignore_warnings: ".dialyzer_ignore"]
+      dialyzer: [ignore_warnings: ".dialyzer_ignore"],
+      docs: docs()
     ]
   end
 
@@ -26,8 +29,7 @@ defmodule TelemetryMetricsStatsd.MixProject do
   defp preferred_cli_env do
     [
       docs: :docs,
-      dialyzer: :test,
-      "coveralls.json": :test
+      dialyzer: :test
     ]
   end
 
@@ -36,7 +38,17 @@ defmodule TelemetryMetricsStatsd.MixProject do
       {:telemetry, "~> 0.4"},
       {:telemetry_metrics, github: "beam-telemetry/telemetry_metrics"},
       {:stream_data, "~> 0.4", only: :test},
-      {:dialyxir, "~> 0.5", only: :test, runtime: false}
+      {:dialyxir, "~> 0.5", only: :test, runtime: false},
+      {:ex_doc, "~> 0.19", only: :docs}
+    ]
+  end
+
+  defp docs do
+    [
+      main: "TelemetryMetricsStatsd",
+      canonical: "http://hexdocs.pm/telemetry_metrics_statsd",
+      source_url: "https://github.com/beam-telemetry/telemetry_metrics",
+      source_ref: "v#{@version}"
     ]
   end
 end
