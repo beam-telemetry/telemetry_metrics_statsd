@@ -36,7 +36,7 @@ defmodule TelemetryMetricsStatsd.MixProject do
   defp deps do
     [
       {:telemetry, "~> 0.4"},
-      {:telemetry_metrics, github: "beam-telemetry/telemetry_metrics"},
+      {:telemetry_metrics, "~> 0.2"},
       {:stream_data, "~> 0.4", only: :test},
       {:dialyxir, "~> 0.5", only: :test, runtime: false},
       {:ex_doc, "~> 0.19", only: :docs}
