@@ -60,7 +60,7 @@ defmodule TelemetryMetricsStatsd do
 
   and the event
 
-      :telemetry.execute([:http, :request], %{duration: 120})
+      :telemetry.execute([:http, :request], %{count: 1})
 
   the following line would be send to StatsD
 
