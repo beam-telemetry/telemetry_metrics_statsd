@@ -66,6 +66,12 @@ defmodule TelemetryMetricsStatsd do
 
       "http.request.count:1|c"
 
+  Note that the counter was bumped by 1, regardless of the measurements included in the event
+  (careful reader will notice that the `:count` measurement we chose for the metric wasn't present
+  in the map of measurements at all!). Such behaviour conforms to the specification of counter as
+  defined by `Telemetry.Metrics` package - a counter should be incremented by 1 every time a given
+  event is dispatched.
+
   ### Last value
 
   Last value metric is represented as a StastD gauge, whose values are always set to the value
