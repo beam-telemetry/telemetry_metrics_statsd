@@ -19,7 +19,7 @@ defmodule TelemetryMetricsStatsd.EventHandler do
       handler_id = handler_id(event_name, reporter)
 
       :ok =
-        :telemetry.attach(handler_id, event_name, &handle_event/4, %{
+        :telemetry.attach(handler_id, event_name, &__MODULE__.handle_event/4, %{
           reporter: reporter,
           metrics: metrics,
           mtu: mtu,
@@ -39,7 +39,7 @@ defmodule TelemetryMetricsStatsd.EventHandler do
     :ok
   end
 
-  defp handle_event(_event, measurements, metadata, %{
+  def handle_event(_event, measurements, metadata, %{
          reporter: reporter,
          metrics: metrics,
          mtu: mtu,
