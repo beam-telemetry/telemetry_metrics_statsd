@@ -55,11 +55,11 @@ workflows:
     jobs:
       - telemetry_metrics_statsd/build_and_test:
           name: "1.8-otp-21"
-          elixir: "1.8.1"
+          elixir: "1.8.2"
           otp: "21"
       - telemetry_metrics_statsd/build_and_test:
           name: "1.8-otp-20"
-          elixir: "1.8.1"
+          elixir: "1.8.2"
           otp: "20"
       - telemetry_metrics_statsd/build_and_test:
           name: "1.5-otp-20"
