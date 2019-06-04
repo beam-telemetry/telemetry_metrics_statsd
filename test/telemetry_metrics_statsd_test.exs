@@ -91,7 +91,7 @@ defmodule TelemetryMetricsStatsdTest do
     assert_reported(socket, "http.requests.GET.404:1|c")
   end
 
-  test "StatsD metric can be reported with StatsD tags" do
+  test "StatsD metric can be reported with DataDog style StatsD tags" do
     {socket, port} = given_udp_port_opened()
 
     counter =
