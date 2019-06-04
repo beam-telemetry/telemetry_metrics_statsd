@@ -149,16 +149,19 @@ defmodule TelemetryMetricsStatsd do
   alias Telemetry.Metrics
   alias TelemetryMetricsStatsd.{EventHandler, UDP}
 
+  @type tag_format :: :name | :datadog
   @type option ::
           {:port, :inet.port_number()}
           | {:host, String.t()}
           | {:metrics, [Metrics.t()]}
           | {:mtu, non_neg_integer()}
           | {:prefix, String.t()}
+          | {:tag_format, tag_format()}
   @type options :: [option]
 
   @default_port 8125
   @default_mtu 512
+  @default_tag_format :name
 
   @doc """
   Reporter's child spec.
@@ -228,12 +231,13 @@ defmodule TelemetryMetricsStatsd do
     port = Keyword.get(options, :port, @default_port)
     host = Keyword.get(options, :host, "localhost") |> to_charlist()
     mtu = Keyword.get(options, :mtu, @default_mtu)
+    tag_format = Keyword.get(options, :tag_format, @default_tag_format)
     prefix = Keyword.get(options, :prefix)
 
     case UDP.open(host, port) do
       {:ok, udp} ->
         Process.flag(:trap_exit, true)
-        handler_ids = EventHandler.attach(metrics, self(), mtu, prefix)
+        handler_ids = EventHandler.attach(metrics, self(), mtu, prefix, tag_format)
         {:ok, %{udp: udp, handler_ids: handler_ids, host: host, port: port}}
 
       {:error, reason} ->

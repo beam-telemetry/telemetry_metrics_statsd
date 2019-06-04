@@ -8,11 +8,12 @@ defmodule TelemetryMetricsStatsd.EventHandler do
           [Metrics.t()],
           reporter :: pid(),
           mtu :: non_neg_integer(),
-          prefix :: String.t() | nil
+          prefix :: String.t() | nil,
+          tag_format :: TelemetryMetricsStatsd.tag_format()
         ) :: [
           :telemetry.handler_id()
         ]
-  def attach(metrics, reporter, mtu, prefix) do
+  def attach(metrics, reporter, mtu, prefix, tag_format) do
     metrics_by_event = Enum.group_by(metrics, & &1.event_name)
 
     for {event_name, metrics} <- metrics_by_event do
@@ -23,7 +24,8 @@ defmodule TelemetryMetricsStatsd.EventHandler do
           reporter: reporter,
           metrics: metrics,
           mtu: mtu,
-          prefix: prefix
+          prefix: prefix,
+          tag_format: tag_format
         })
 
       handler_id
@@ -43,7 +45,8 @@ defmodule TelemetryMetricsStatsd.EventHandler do
          reporter: reporter,
          metrics: metrics,
          mtu: mtu,
-         prefix: prefix
+         prefix: prefix,
+         tag_format: tag_format
        }) do
     packets =
       for metric <- metrics do
@@ -52,7 +55,7 @@ defmodule TelemetryMetricsStatsd.EventHandler do
             # The order of tags needs to be preserved so that the final metric name is built correctly.
             tag_values = metric.tag_values.(metadata)
             tags = Enum.map(metric.tags, &{&1, Map.fetch!(tag_values, &1)})
-            Formatter.format(prefix, metric, value, tags)
+            Formatter.format(prefix, metric, value, tags, tag_format)
 
           :error ->
             :nopublish

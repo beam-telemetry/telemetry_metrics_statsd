@@ -91,6 +91,28 @@ defmodule TelemetryMetricsStatsdTest do
     assert_reported(socket, "http.requests.GET.404:1|c")
   end
 
+  test "StatsD metric can be reported with StatsD tags" do
+    {socket, port} = given_udp_port_opened()
+
+    counter =
+      given_counter(
+        "http.requests",
+        event_name: "http.request",
+        metadata: :all,
+        tags: [:method, :status]
+      )
+
+    start_reporter(metrics: [counter], port: port, tag_format: :datadog)
+
+    :telemetry.execute([:http, :request], %{latency: 172}, %{method: "GET", status: 200})
+    :telemetry.execute([:http, :request], %{latency: 200}, %{method: "POST", status: 201})
+    :telemetry.execute([:http, :request], %{latency: 198}, %{method: "GET", status: 404})
+
+    assert_reported(socket, "http.requests:1|c#method:GET,status:200")
+    assert_reported(socket, "http.requests:1|c#method:POST,status:201")
+    assert_reported(socket, "http.requests:1|c#method:GET,status:404")
+  end
+
   test "measurement function is taken into account when getting the value for the metric" do
     {socket, port} = given_udp_port_opened()
     last_value = given_last_value("vm.memory.total", measurement: fn m -> m.total * 2 end)
