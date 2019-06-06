@@ -155,7 +155,7 @@ defmodule TelemetryMetricsStatsd do
           | {:metrics, [Metrics.t()]}
           | {:mtu, non_neg_integer()}
           | {:prefix, String.t()}
-          | {:formatter, TelemetryMetricsStatsd.Formatter}
+          | {:formatter, module()}
   @type options :: [option]
 
   @default_port 8125
