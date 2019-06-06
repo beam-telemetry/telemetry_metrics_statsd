@@ -49,6 +49,21 @@ defmodule TelemetryMetricsStatsdTest do
     assert_reported(socket, "vm.memory.total:1872|g")
   end
 
+  test "summary metric is reported as StastD timer" do
+    {socket, port} = given_udp_port_opened()
+    summary = given_summary("http.request.latency")
+
+    start_reporter(metrics: [summary], port: port)
+
+    :telemetry.execute([:http, :request], %{latency: 172})
+    :telemetry.execute([:http, :request], %{latency: 200})
+    :telemetry.execute([:http, :request], %{latency: 198})
+
+    assert_reported(socket, "http.request.latency:172|ms")
+    assert_reported(socket, "http.request.latency:200|ms")
+    assert_reported(socket, "http.request.latency:198|ms")
+  end
+
   test "distribution metric is reported as StastD timer" do
     {socket, port} = given_udp_port_opened()
 
@@ -218,7 +233,8 @@ defmodule TelemetryMetricsStatsdTest do
 
     :telemetry.execute([:http, :request], %{latency: 200, current_memory: 200, payload_size: 200})
 
-    assert_reported(socket,
+    assert_reported(
+      socket,
       "myapp.http.request.count:1|c\n" <>
         "myapp.http.request.latency:200|ms\n" <>
         "myapp.http.request.current_memory:200|g\n" <>
@@ -336,6 +352,10 @@ defmodule TelemetryMetricsStatsdTest do
 
   defp given_last_value(event_name, opts \\ []) do
     Telemetry.Metrics.last_value(event_name, opts)
+  end
+
+  defp given_summary(event_name, opts \\ []) do
+    Telemetry.Metrics.summary(event_name, opts)
   end
 
   defp given_distribution(event_name, opts) do

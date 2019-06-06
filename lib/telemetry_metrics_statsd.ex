@@ -104,6 +104,21 @@ defmodule TelemetryMetricsStatsd do
 
   When the measurement is negative, the StatsD gauge is decreased accordingly.
 
+  ### Summary
+
+  The summary is simply represented as a StatsD timer, since it should generate statistics about
+  gathered measurements. Given the metric definition below
+
+      summary("http.request.duration")
+
+  and the event
+
+      :telemetry.execute([:http, :request], %{duration: 120})
+
+  the following line would be send to StatsD
+
+      "http.request.duration:120|ms"
+
   ### Distribution
 
   There is no metric in StatsD (or at least in the
