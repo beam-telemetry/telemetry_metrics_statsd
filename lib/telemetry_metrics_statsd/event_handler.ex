@@ -9,7 +9,7 @@ defmodule TelemetryMetricsStatsd.EventHandler do
           reporter :: pid(),
           mtu :: non_neg_integer(),
           prefix :: String.t() | nil,
-          formatter :: TelemetryMetricsStatsd.Formatter
+          formatter :: module()
         ) :: [
           :telemetry.handler_id()
         ]
