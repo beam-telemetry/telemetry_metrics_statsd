@@ -2,17 +2,18 @@ defmodule TelemetryMetricsStatsd.EventHandler do
   @moduledoc false
 
   alias Telemetry.Metrics
-  alias TelemetryMetricsStatsd.{Formatter, Packet, UDP}
+  alias TelemetryMetricsStatsd.{Packet, UDP}
 
   @spec attach(
           [Metrics.t()],
           reporter :: pid(),
           mtu :: non_neg_integer(),
-          prefix :: String.t() | nil
+          prefix :: String.t() | nil,
+          formatter :: module()
         ) :: [
           :telemetry.handler_id()
         ]
-  def attach(metrics, reporter, mtu, prefix) do
+  def attach(metrics, reporter, mtu, prefix, formatter) do
     metrics_by_event = Enum.group_by(metrics, & &1.event_name)
 
     for {event_name, metrics} <- metrics_by_event do
@@ -23,7 +24,8 @@ defmodule TelemetryMetricsStatsd.EventHandler do
           reporter: reporter,
           metrics: metrics,
           mtu: mtu,
-          prefix: prefix
+          prefix: prefix,
+          formatter: formatter
         })
 
       handler_id
@@ -40,11 +42,12 @@ defmodule TelemetryMetricsStatsd.EventHandler do
   end
 
   def handle_event(_event, measurements, metadata, %{
-         reporter: reporter,
-         metrics: metrics,
-         mtu: mtu,
-         prefix: prefix
-       }) do
+        reporter: reporter,
+        metrics: metrics,
+        mtu: mtu,
+        prefix: prefix,
+        formatter: formatter_mod
+      }) do
     packets =
       for metric <- metrics do
         case fetch_measurement(metric, measurements) do
@@ -52,7 +55,8 @@ defmodule TelemetryMetricsStatsd.EventHandler do
             # The order of tags needs to be preserved so that the final metric name is built correctly.
             tag_values = metric.tag_values.(metadata)
             tags = Enum.map(metric.tags, &{&1, Map.fetch!(tag_values, &1)})
-            Formatter.format(prefix, metric, value, tags)
+            normalized_name = add_prefix_to_metric_name(prefix, metric.name)
+            formatter_mod.format(metric, normalized_name, value, tags)
 
           :error ->
             :nopublish
@@ -119,4 +123,7 @@ defmodule TelemetryMetricsStatsd.EventHandler do
       end
     end)
   end
+
+  defp add_prefix_to_metric_name(nil, metric_name), do: metric_name
+  defp add_prefix_to_metric_name(prefix, metric_name), do: [prefix | metric_name]
 end

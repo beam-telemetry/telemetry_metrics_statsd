@@ -170,10 +170,12 @@ defmodule TelemetryMetricsStatsd do
           | {:metrics, [Metrics.t()]}
           | {:mtu, non_neg_integer()}
           | {:prefix, String.t()}
+          | {:formatter, module()}
   @type options :: [option]
 
   @default_port 8125
   @default_mtu 512
+  @default_formatter TelemetryMetricsStatsd.Formatter.Standard
 
   @doc """
   Reporter's child spec.
@@ -244,11 +246,12 @@ defmodule TelemetryMetricsStatsd do
     host = Keyword.get(options, :host, "localhost") |> to_charlist()
     mtu = Keyword.get(options, :mtu, @default_mtu)
     prefix = Keyword.get(options, :prefix)
+    formatter = Keyword.get(options, :formatter, @default_formatter)
 
     case UDP.open(host, port) do
       {:ok, udp} ->
         Process.flag(:trap_exit, true)
-        handler_ids = EventHandler.attach(metrics, self(), mtu, prefix)
+        handler_ids = EventHandler.attach(metrics, self(), mtu, prefix, formatter)
         {:ok, %{udp: udp, handler_ids: handler_ids, host: host, port: port}}
 
       {:error, reason} ->
