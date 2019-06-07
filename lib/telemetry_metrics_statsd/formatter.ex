@@ -2,8 +2,8 @@ defmodule TelemetryMetricsStatsd.Formatter do
   @moduledoc false
 
   @callback format(
-              prefix :: String.t() | nil,
               Telemetry.Metrics.t(),
+              Telemetry.Metrics.normalized_metric_name(),
               :telemetry.event_value(),
               tags :: [
                 {Telemetry.Metrics.tag(), term()}

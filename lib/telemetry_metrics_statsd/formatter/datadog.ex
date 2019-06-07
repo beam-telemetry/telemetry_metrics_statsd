@@ -6,20 +6,15 @@ defmodule TelemetryMetricsStatsd.Formatter.Datadog do
   alias Telemetry.Metrics
 
   @impl true
-  def format(prefix, metric, value, tags) do
+  def format(metric, normalized_name, value, tags) do
     [
-      format_metric_name(prefix, metric.name),
+      format_metric_name(normalized_name),
       ?:,
       format_metric_value(metric, value),
       format_metric_tags(tags)
     ]
     |> :erlang.iolist_to_binary()
   end
-
-  defp format_metric_name(nil, metric_name), do: format_metric_name(metric_name)
-
-  defp format_metric_name(prefix, metric_name),
-    do: format_metric_name([prefix | metric_name])
 
   defp format_metric_name(metric_name) do
     metric_name

@@ -55,7 +55,8 @@ defmodule TelemetryMetricsStatsd.EventHandler do
             # The order of tags needs to be preserved so that the final metric name is built correctly.
             tag_values = metric.tag_values.(metadata)
             tags = Enum.map(metric.tags, &{&1, Map.fetch!(tag_values, &1)})
-            formatter_mod.format(prefix, metric, value, tags)
+            normalized_name = add_prefix_to_metric_name(prefix, metric.name)
+            formatter_mod.format(metric, normalized_name, value, tags)
 
           :error ->
             :nopublish
@@ -122,4 +123,7 @@ defmodule TelemetryMetricsStatsd.EventHandler do
       end
     end)
   end
+
+  defp add_prefix_to_metric_name(nil, metric_name), do: metric_name
+  defp add_prefix_to_metric_name(prefix, metric_name), do: [prefix | metric_name]
 end

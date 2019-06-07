@@ -6,15 +6,10 @@ defmodule TelemetryMetricsStatsd.Formatter.Standard do
   alias Telemetry.Metrics
 
   @impl true
-  def format(prefix, metric, value, tags) do
-    [format_metric_name(prefix, metric.name, tags), ?:, format_metric_value(metric, value)]
+  def format(metric, normalized_name, value, tags) do
+    [format_metric_name(normalized_name, tags), ?:, format_metric_value(metric, value)]
     |> :erlang.iolist_to_binary()
   end
-
-  defp format_metric_name(nil, metric_name, tags), do: format_metric_name(metric_name, tags)
-
-  defp format_metric_name(prefix, metric_name, tags),
-    do: format_metric_name([prefix | metric_name], tags)
 
   defp format_metric_name(metric_name, tags) do
     segments = metric_name ++ Enum.map(tags, fn {_, tag_value} -> tag_value end)
