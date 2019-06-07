@@ -117,7 +117,11 @@ defmodule TelemetryMetricsStatsdTest do
         tags: [:method, :status]
       )
 
-    start_reporter(metrics: [counter], port: port, formatter: TelemetryMetricsStatsd.Formatter.Datadog)
+    start_reporter(
+      metrics: [counter],
+      port: port,
+      formatter: TelemetryMetricsStatsd.Formatter.Datadog
+    )
 
     :telemetry.execute([:http, :request], %{latency: 172}, %{method: "GET", status: 200})
     :telemetry.execute([:http, :request], %{latency: 200}, %{method: "POST", status: 201})
@@ -259,8 +263,7 @@ defmodule TelemetryMetricsStatsdTest do
       socket,
       "myapp.http.request.count:1|c\n" <>
         "myapp.http.request.latency:200|ms\n" <>
-        "myapp.http.request.current_memory:200|g\n" <>
-        "myapp.http.request.payload_size:+200|g"
+        "myapp.http.request.current_memory:200|g\n" <> "myapp.http.request.payload_size:+200|g"
     )
   end
 

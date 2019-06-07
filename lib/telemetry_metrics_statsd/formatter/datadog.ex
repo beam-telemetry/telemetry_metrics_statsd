@@ -17,6 +17,7 @@ defmodule TelemetryMetricsStatsd.Formatter.Datadog do
   end
 
   defp format_metric_name(nil, metric_name), do: format_metric_name(metric_name)
+
   defp format_metric_name(prefix, metric_name),
     do: format_metric_name([prefix | metric_name])
 
@@ -39,6 +40,7 @@ defmodule TelemetryMetricsStatsd.Formatter.Datadog do
     Enum.reduce(tags, [], fn
       {k, v}, [] ->
         [["#{k}:#{v}"]]
+
       {k, v}, acc ->
         [[?,, "#{k}:#{v}"] | acc]
     end)

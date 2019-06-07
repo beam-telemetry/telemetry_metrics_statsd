@@ -42,12 +42,12 @@ defmodule TelemetryMetricsStatsd.EventHandler do
   end
 
   def handle_event(_event, measurements, metadata, %{
-         reporter: reporter,
-         metrics: metrics,
-         mtu: mtu,
-         prefix: prefix,
-         formatter: formatter_mod
-       }) do
+        reporter: reporter,
+        metrics: metrics,
+        mtu: mtu,
+        prefix: prefix,
+        formatter: formatter_mod
+      }) do
     packets =
       for metric <- metrics do
         case fetch_measurement(metric, measurements) do

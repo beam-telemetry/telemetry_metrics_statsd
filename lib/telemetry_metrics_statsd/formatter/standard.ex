@@ -12,6 +12,7 @@ defmodule TelemetryMetricsStatsd.Formatter.Standard do
   end
 
   defp format_metric_name(nil, metric_name, tags), do: format_metric_name(metric_name, tags)
+
   defp format_metric_name(prefix, metric_name, tags),
     do: format_metric_name([prefix | metric_name], tags)
 
