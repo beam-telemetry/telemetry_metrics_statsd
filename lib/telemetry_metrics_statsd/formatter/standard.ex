@@ -1,4 +1,4 @@
-defmodule TelemetryMetricsStatsd.Formatter.Basic do
+defmodule TelemetryMetricsStatsd.Formatter.Standard do
   @moduledoc false
 
   @behaviour TelemetryMetricsStatsd.Formatter

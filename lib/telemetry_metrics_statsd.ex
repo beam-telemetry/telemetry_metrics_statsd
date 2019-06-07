@@ -175,7 +175,7 @@ defmodule TelemetryMetricsStatsd do
 
   @default_port 8125
   @default_mtu 512
-  @default_formatter TelemetryMetricsStatsd.Formatter.Basic
+  @default_formatter TelemetryMetricsStatsd.Formatter.Standard
 
   @doc """
   Reporter's child spec.
