@@ -2,7 +2,7 @@ defmodule TelemetryMetricsStatsdTest do
   use ExUnit.Case, async: true
 
   import ExUnit.CaptureLog
-  import TelemetryMetricsStatsd.Test.WaitUntil
+  import TelemetryMetricsStatsd.Test.{Helpers, WaitUntil}
 
   test "counter metric is reported as StatsD counter with 1 as a value" do
     {socket, port} = given_udp_port_opened()
@@ -82,28 +82,6 @@ defmodule TelemetryMetricsStatsdTest do
     assert_reported(socket, "http.request.latency:172|ms")
     assert_reported(socket, "http.request.latency:200|ms")
     assert_reported(socket, "http.request.latency:198|ms")
-  end
-
-  test "StatsD metric name is based on metric name and tags" do
-    {socket, port} = given_udp_port_opened()
-
-    counter =
-      given_counter(
-        "http.requests",
-        event_name: "http.request",
-        metadata: :all,
-        tags: [:method, :status]
-      )
-
-    start_reporter(metrics: [counter], port: port)
-
-    :telemetry.execute([:http, :request], %{latency: 172}, %{method: "GET", status: 200})
-    :telemetry.execute([:http, :request], %{latency: 200}, %{method: "POST", status: 201})
-    :telemetry.execute([:http, :request], %{latency: 198}, %{method: "GET", status: 404})
-
-    assert_reported(socket, "http.requests.GET.200:1|c")
-    assert_reported(socket, "http.requests.POST.201:1|c")
-    assert_reported(socket, "http.requests.GET.404:1|c")
   end
 
   test "DataDog formatter can be provided" do
@@ -245,7 +223,7 @@ defmodule TelemetryMetricsStatsdTest do
     end
   end
 
-  test "published metrics are prefixed with a provided prefix" do
+  test "published metrics are prefixed with the provided prefix" do
     {socket, port} = given_udp_port_opened()
 
     metrics = [
@@ -335,56 +313,10 @@ defmodule TelemetryMetricsStatsdTest do
     refute_reported(socket)
   end
 
-  test "negative sum metric measurement decreases the gauge's value" do
-    {socket, port} = given_udp_port_opened()
-    sum = given_sum("my.metric", event_name: [:my, :event], measurement: :number)
-
-    start_reporter(metrics: [sum], port: port)
-
-    :telemetry.execute([:my, :event], %{number: -1})
-
-    assert_reported(socket, "my.metric:-1|g")
-  end
-
-  test "float measurements are rounded to integers" do
-    {socket, port} = given_udp_port_opened()
-    sum = given_sum("my.metric", event_name: [:my, :event], measurement: :float)
-
-    start_reporter(metrics: [sum], port: port)
-
-    :telemetry.execute([:my, :event], %{float: 12.5})
-    :telemetry.execute([:my, :event], %{float: 13.1})
-    :telemetry.execute([:my, :event], %{float: -11.5})
-
-    assert_reported(socket, "my.metric:+13|g")
-    assert_reported(socket, "my.metric:+13|g")
-    assert_reported(socket, "my.metric:-12|g")
-  end
-
   defp given_udp_port_opened() do
     {:ok, socket} = :gen_udp.open(0, [:binary, active: false])
     {:ok, port} = :inet.port(socket)
     {socket, port}
-  end
-
-  defp given_counter(event_name, opts \\ []) do
-    Telemetry.Metrics.counter(event_name, opts)
-  end
-
-  defp given_sum(event_name, opts \\ []) do
-    Telemetry.Metrics.sum(event_name, opts)
-  end
-
-  defp given_last_value(event_name, opts \\ []) do
-    Telemetry.Metrics.last_value(event_name, opts)
-  end
-
-  defp given_summary(event_name, opts \\ []) do
-    Telemetry.Metrics.summary(event_name, opts)
-  end
-
-  defp given_distribution(event_name, opts) do
-    Telemetry.Metrics.distribution(event_name, opts)
   end
 
   defp start_reporter(options) do

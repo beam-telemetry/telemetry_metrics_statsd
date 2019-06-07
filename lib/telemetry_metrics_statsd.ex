@@ -169,7 +169,7 @@ defmodule TelemetryMetricsStatsd do
           | {:host, String.t()}
           | {:metrics, [Metrics.t()]}
           | {:mtu, non_neg_integer()}
-          | {:prefix, String.t()}
+          | {:prefix, String.t() | nil}
           | {:formatter, module()}
   @type options :: [option]
 

@@ -2,14 +2,14 @@ defmodule TelemetryMetricsStatsd.EventHandler do
   @moduledoc false
 
   alias Telemetry.Metrics
-  alias TelemetryMetricsStatsd.{Packet, UDP}
+  alias TelemetryMetricsStatsd.{Formatter, Packet, UDP}
 
   @spec attach(
           [Metrics.t()],
           reporter :: pid(),
           mtu :: non_neg_integer(),
           prefix :: String.t() | nil,
-          formatter :: module()
+          formatter :: Formatter.t()
         ) :: [
           :telemetry.handler_id()
         ]
@@ -55,8 +55,7 @@ defmodule TelemetryMetricsStatsd.EventHandler do
             # The order of tags needs to be preserved so that the final metric name is built correctly.
             tag_values = metric.tag_values.(metadata)
             tags = Enum.map(metric.tags, &{&1, Map.fetch!(tag_values, &1)})
-            normalized_name = add_prefix_to_metric_name(prefix, metric.name)
-            formatter_mod.format(metric, normalized_name, value, tags)
+            Formatter.format(formatter_mod, metric, prefix, value, tags)
 
           :error ->
             :nopublish
@@ -95,16 +94,10 @@ defmodule TelemetryMetricsStatsd.EventHandler do
           measurements[key]
       end
 
-    cond do
-      is_float(value) ->
-        # The StatsD metrics we implement support only numerical values.
-        {:ok, round(value)}
-
-      is_integer(value) ->
-        {:ok, value}
-
-      true ->
-        :error
+    if is_number(value) do
+      {:ok, value}
+    else
+      :error
     end
   end
 
@@ -123,7 +116,4 @@ defmodule TelemetryMetricsStatsd.EventHandler do
       end
     end)
   end
-
-  defp add_prefix_to_metric_name(nil, metric_name), do: metric_name
-  defp add_prefix_to_metric_name(prefix, metric_name), do: [prefix | metric_name]
 end
