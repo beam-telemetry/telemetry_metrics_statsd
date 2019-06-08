@@ -13,7 +13,7 @@ defmodule TelemetryMetricsStatsd.FormatterTest do
              "api.http.duration.users.GET:1|c"
 
     assert Formatter.format(Datadog, metric, "api", 1, resource: "users", method: "GET") ==
-             "api.http.duration:1|c#resource:users,method:GET"
+             "api.http.duration:1|c|#resource:users,method:GET"
   end
 
   test "formats the measurement using provided formatter implementation without prefix" do
@@ -23,6 +23,6 @@ defmodule TelemetryMetricsStatsd.FormatterTest do
              "http.duration.users.GET:1|c"
 
     assert Formatter.format(Datadog, metric, nil, 1, resource: "users", method: "GET") ==
-             "http.duration:1|c#resource:users,method:GET"
+             "http.duration:1|c|#resource:users,method:GET"
   end
 end

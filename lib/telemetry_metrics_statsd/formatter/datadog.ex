@@ -15,29 +15,56 @@ defmodule TelemetryMetricsStatsd.Formatter.Datadog do
     ]
   end
 
-  defp format_metric_name(metric_name) do
-    metric_name
-    |> Enum.map(&to_string/1)
-    |> Enum.intersperse(?.)
+  defp format_metric_name([segment]) do
+    [:erlang.atom_to_binary(segment, :utf8)]
+  end
+
+  defp format_metric_name([segment | segments]) do
+    [:erlang.atom_to_binary(segment, :utf8), ?. | format_metric_name(segments)]
   end
 
   defp format_metric_value(%Metrics.Counter{}, _value), do: "1|c"
-  defp format_metric_value(%Metrics.Summary{}, value), do: "#{value}|ms"
-  defp format_metric_value(%Metrics.Distribution{}, value), do: "#{value}|ms"
-  defp format_metric_value(%Metrics.LastValue{}, value), do: "#{value}|g"
-  defp format_metric_value(%Metrics.Sum{}, value) when value >= 0, do: "+#{value}|g"
-  defp format_metric_value(%Metrics.Sum{}, value), do: "#{value}|g"
 
-  defp format_metric_tags(tags), do: [?# | combine_tags(tags)]
+  defp format_metric_value(%Metrics.Summary{}, value),
+    do: [format_number(value), "|ms"]
 
-  defp combine_tags(tags) do
-    Enum.reduce(tags, [], fn
-      {k, v}, [] ->
-        [["#{k}:#{v}"]]
+  defp format_metric_value(%Metrics.Distribution{}, value),
+    do: [format_number(value), "|h"]
 
-      {k, v}, acc ->
-        [[?,, "#{k}:#{v}"] | acc]
-    end)
-    |> Enum.reverse()
+  defp format_metric_value(%Metrics.LastValue{}, value),
+    do: [format_number(value), "|g"]
+
+  defp format_metric_value(%Metrics.Sum{}, value) when value >= 0,
+    do: [?+, format_number(value), "|g"]
+
+  defp format_metric_value(%Metrics.Sum{}, value),
+    do: [format_number(value), "|g"]
+
+  defp format_number(number) when is_integer(number) do
+    :erlang.integer_to_binary(number)
+  end
+
+  defp format_number(number) when is_float(number) do
+    Float.to_string(number)
+  end
+
+  defp format_metric_tags([]), do: []
+
+  defp format_metric_tags([{k, v} | tags]), do: ["|#", format_tag(k, v), combine_tags(tags)]
+
+  defp combine_tags([]) do
+    []
+  end
+
+  defp combine_tags([{k, v} | tags]) do
+    [?,, format_tag(k, v), combine_tags(tags)]
+  end
+
+  defp format_tag(k, nil) do
+    [:erlang.atom_to_binary(k, :utf8), ?:, "nil"]
+  end
+
+  defp format_tag(k, v) do
+    [:erlang.atom_to_binary(k, :utf8), ?:, to_string(v)]
   end
 end

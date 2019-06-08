@@ -1,0 +1,79 @@
+defmodule TelemetryMetricsStatsd.Formatter.DatadogTest do
+  use ExUnit.Case, async: true
+
+  import TelemetryMetricsStatsd.Test.Helpers
+
+  alias TelemetryMetricsStatsd.Formatter.Datadog
+
+  test "counter update is formatted as a Datadog counter with 1 as a value" do
+    m = given_counter("my.awesome.metric")
+
+    assert format(m, 30, []) == "my.awesome.metric:1|c"
+  end
+
+  test "positive sum update is formatted as a Datadog gauge with +n value" do
+    m = given_sum("my.awesome.metric")
+
+    assert format(m, 21, []) == "my.awesome.metric:+21|g"
+  end
+
+  test "negative sum update is formatted as a Datadog gauge with -n value" do
+    m = given_sum("my.awesome.metric")
+
+    assert format(m, -21, []) == "my.awesome.metric:-21|g"
+  end
+
+  test "last_value update is formatted as a Datadog gauge with absolute value" do
+    m = given_last_value("my.awesome.metric")
+
+    assert format(m, -18, []) == "my.awesome.metric:-18|g"
+  end
+
+  test "summary update is formatted as a Datadog timer" do
+    m = given_summary("my.awesome.metric")
+
+    assert format(m, 121, []) == "my.awesome.metric:121|ms"
+  end
+
+  test "distribution update is formatted as a Datadog histogram" do
+    m = given_distribution("my.awesome.metric", buckets: {0..300, 100})
+
+    assert format(m, 131, []) == "my.awesome.metric:131|h"
+  end
+
+  test "StatsD metric name is based on metric name and tags" do
+    m = given_last_value("my.awesome.metric", tags: [:method, :status])
+
+    assert format(m, 131, method: "GET", status: 200) ==
+             "my.awesome.metric:131|g|#method:GET,status:200"
+  end
+
+  test "nil tags are included in the formatted metric" do
+    m = given_last_value("my.awesome.metric", tags: [:method, :status])
+
+    assert format(m, 131, method: nil, status: 200) ==
+             "my.awesome.metric:131|g|#method:nil,status:200"
+  end
+
+  test "tags passed as explicit argument are used for the formatted metric" do
+    m = given_last_value("my.awesome.metric", tags: [:whatever])
+
+    assert format(m, 131, method: "GET", status: 200) ==
+             "my.awesome.metric:131|g|#method:GET,status:200"
+  end
+
+  test "float measurements are allowed" do
+    m = given_last_value("my.awesome.metric")
+
+    assert format(m, 131.4, []) ==
+             "my.awesome.metric:131.4|g"
+
+    assert format(m, 131.5, []) ==
+             "my.awesome.metric:131.5|g"
+  end
+
+  defp format(metric, value, tags) do
+    Datadog.format(metric, value, tags)
+    |> :erlang.iolist_to_binary()
+  end
+end

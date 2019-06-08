@@ -105,9 +105,9 @@ defmodule TelemetryMetricsStatsdTest do
     :telemetry.execute([:http, :request], %{latency: 200}, %{method: "POST", status: 201})
     :telemetry.execute([:http, :request], %{latency: 198}, %{method: "GET", status: 404})
 
-    assert_reported(socket, "http.requests:1|c#method:GET,status:200")
-    assert_reported(socket, "http.requests:1|c#method:POST,status:201")
-    assert_reported(socket, "http.requests:1|c#method:GET,status:404")
+    assert_reported(socket, "http.requests:1|c|#method:GET,status:200")
+    assert_reported(socket, "http.requests:1|c|#method:POST,status:201")
+    assert_reported(socket, "http.requests:1|c|#method:GET,status:404")
   end
 
   test "measurement function is taken into account when getting the value for the metric" do
