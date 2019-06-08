@@ -2,7 +2,7 @@
 
 [![CircleCI](https://circleci.com/gh/arkgil/telemetry_metrics_statsd.svg?style=svg)](https://circleci.com/gh/arkgil/telemetry_metrics_statsd)
 
-`Telemetry.Metrics` reporter for StatsD-compatible metric servers.
+`Telemetry.Metrics` reporter for StatsD-compatible metric servers (including DataDog).
 
 To use it, start the reporter with the `start_link/1` function, providing it a list of
 `Telemetry.Metrics` metric definitions:
@@ -43,6 +43,27 @@ published metrics using the `:prefix` option.
 
 Note that the reporter doesn't aggregate metrics in-process - it sends metric updates to StatsD
 whenever a relevant Telemetry event is emitted.
+
+## DataDog integration
+
+To use the reporter with DataDog, add a `formatter: :datadog` to the reporter's list of options:
+
+```elixir
+import Telemetry.Metrics
+
+children = [
+  {TelemetryMetricsStatsd, [
+    metrics: [
+      counter("http.request.count"),
+      sum("http.request.payload_size"),
+      last_value("vm.memory.total")
+    ],
+    formatter: :datadog
+  ]}
+]
+
+Supervisor.start_link(children, ...)
+```
 
 ## Installation
 

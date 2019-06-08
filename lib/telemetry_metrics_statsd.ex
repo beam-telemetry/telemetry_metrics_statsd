@@ -31,14 +31,22 @@ defmodule TelemetryMetricsStatsd do
 
   Telemetry.Metrics metric names are translated as follows:
     * if the metric name was provided as a string, e.g. `"http.request.count"`, it is sent to
-      StastD server as-is
+      StatsD server as-is
     * if the metric name was provided as a list of atoms, e.g. `[:http, :request, :count]`, it is
       first converted to a string by joiging the segments with dots. In this example, the StatsD
       metric name would be `"http.request.count"` as well
 
-  The names look a little bit different if metric tags are used - since not all StatsD
-  implementations allow explicit tagging, tag values are appended as consecutive segments of the
-  metric name. For example, given the definition
+  Since there are multiple implementations of StatsD and each of them provides slightly different
+  set of features, other aspects of metric translation are controlled by the formatters.
+  The formatter can be selected using the `:formatter` option. Currently only two formats are
+  supported - `:standard` and `:datadog`.
+
+  ### The standard StatsD formatter
+
+  The `:standard` formatter is compatible with the
+  [Etsy implementation](https://github.com/statsd/statsd/blob/master/docs/metric_types.md) of StatsD.
+  Since this particular implementation doesn't support explicit tags, tag values are appended as
+  consecutive segments of the metric name. For example, given the definition
 
       counter("db.query.count", tags: [:table, :operation])
 
@@ -46,12 +54,15 @@ defmodule TelemetryMetricsStatsd do
 
       :telemetry.execute([:db, :query], %{}, %{table: "users", operation: "select"})
 
-  the StastD metric name would be `"db.query.count.users.select"`. Note that the tag values are
+  the StatsD metric name would be `"db.query.count.users.select"`. Note that the tag values are
   appended to the base metric name in the order they were declared in the metric definition.
+
+  Another important aspect of the standard formatter is that all measurements are converted to
+  integers, i.e. no floats are ever sent to the StatsD daemon.
 
   Now to the metric types!
 
-  ### Counter
+  #### Counter
 
   Telemetry.Metrics counter is simply represented as a StatsD counter. Each event the metric is
   based on increments the counter by 1. To be more concrete, given the metric definition
@@ -72,9 +83,9 @@ defmodule TelemetryMetricsStatsd do
   defined by `Telemetry.Metrics` package - a counter should be incremented by 1 every time a given
   event is dispatched.
 
-  ### Last value
+  #### Last value
 
-  Last value metric is represented as a StastD gauge, whose values are always set to the value
+  Last value metric is represented as a StatsD gauge, whose values are always set to the value
   of the measurement from the most recent event. With the following metric definition
 
       last_value("vm.memory.total")
@@ -87,7 +98,7 @@ defmodule TelemetryMetricsStatsd do
 
       "vm.memory.total:1024|g"
 
-  ### Sum
+  #### Sum
 
   Sum metric is also represented as a gauge - the difference is that it always changes relatively
   and is never set to an absolute value. Given metric definition below
@@ -104,7 +115,7 @@ defmodule TelemetryMetricsStatsd do
 
   When the measurement is negative, the StatsD gauge is decreased accordingly.
 
-  ### Summary
+  #### Summary
 
   The summary is simply represented as a StatsD timer, since it should generate statistics about
   gathered measurements. Given the metric definition below
@@ -119,13 +130,13 @@ defmodule TelemetryMetricsStatsd do
 
       "http.request.duration:120|ms"
 
-  ### Distribution
+  #### Distribution
 
-  There is no metric in StatsD (or at least in the
-  [Etsy implementation](https://github.com/statsd/statsd/blob/master/docs/metric_types.md))
-  equivalent to Telemetry.Metrics distribution. However, since the goal of a distribution metric
-  is to gain an insight into statistics of data points, this reporter translates it to StatsD
-  timer. For example, given the following metric definition
+  There is no metric in original StatsD implementation equivalent to Telemetry.Metrics distribution.
+  However, histograms can be enabled for selected timer metrics in the
+  [StatsD daemon configuration](https://github.com/statsd/statsd/blob/master/docs/metric_types.md#timing).
+  Because of that, the distribution is also reported as a timer. For example, given the following metric
+  definition
 
       distribution("http.request.duration", buckets: [0])
 
@@ -137,17 +148,41 @@ defmodule TelemetryMetricsStatsd do
 
       "http.request.duration:120|ms"
 
-  Since StatsD timers don't maintain a histogram of values, **distribution's `:buckets` option
-  has no meaning in case of this reporter**.
+  Since histograms are configured on the StatsD server side, the `:buckets` option has no effect
+  when used with this reporter.
 
-  > Note: all floating point measurements are rounded to the nearest integer.
+  ### The DataDog formatter
+
+  The DataDog formatter is compatible with [DogStatsD](https://docs.datadoghq.com/developers/dogstatsd/),
+  the DataDog StatsD service bundled with its agent.
+
+  #### Tags
+
+  The main difference from the standard formatter is that DataDog supports explicit tagging in its
+  protocol. Using the same example as with the standard formatter, given the following definition
+
+      counter("db.query.count", tags: [:table, :operation])
+
+  and the event
+
+      :telemetry.execute([:db, :query], %{}, %{table: "users", operation: "select"})
+
+  the metric update packet sent to StatsD would be `db.query.count:1|c|#table:users,operation:select`.
+
+  #### Metric types
+
+  The only difference between DataDog and standard StatsD metric types is that DataDog provides
+  a dedicated histogram metric. That's why Telemetry.Metrics distribution is translated to DataDog
+  histogram.
+
+  Also note that DataDog allows measurements to be floats, that's why no rounding is performed when
+  formatting the metric.
 
   ## Prefixing metric names
 
-  Since not all the StatsD implementations provide a proper tagging system, sometimes it's convenient
-  to prefix all metric names with particular value, to group them by the name of the service,
-  the host, or something else. You can use `:prefix` option to provide a prefix which will be
-  prepended to all metrics published by the reporter.
+  Sometimes it's convenient to prefix all metric names with particular value, to group them by the
+  name of the service, the host, or something else. You can use `:prefix` option to provide a prefix
+  which will be prepended to all metrics published by the reporter (regardless of the formatter used).
 
   ## Maximum datagram size
 
@@ -202,6 +237,8 @@ defmodule TelemetryMetricsStatsd do
     reporter
   * `:host` - hostname of the StatsD server. Defaults to `"localhost"`.
   * `:port` - port number of the StatsD server. Defaults to `8125`.
+  * `:formatter` - determines the format of the metrics sent to the target server. Can be either
+    `:standard` or `:datadog`. Defaults to `:standard`.
   * `:prefix` - a prefix prepended to the name of each metric published by the reporter. Defaults
     to `nil`.
   * `:mtu` - Maximum Transmission Unit of the link between your application and the StatsD server in
@@ -228,11 +265,13 @@ defmodule TelemetryMetricsStatsd do
     config =
       options
       |> Enum.into(%{})
-      |> Map.update(
-        :formatter,
-        TelemetryMetricsStatsd.Formatter.Standard,
-        &validate_and_translate_formatter/1
-      )
+      |> Map.put_new(:host, "localhost")
+      |> Map.update!(:host, &to_charlist/1)
+      |> Map.put_new(:port, @default_port)
+      |> Map.put_new(:mtu, @default_mtu)
+      |> Map.put_new(:prefix, nil)
+      |> Map.put_new(:formatter, @default_formatter)
+      |> Map.update!(:formatter, &validate_and_translate_formatter/1)
 
     GenServer.start_link(__MODULE__, config)
   end
@@ -252,16 +291,15 @@ defmodule TelemetryMetricsStatsd do
   @impl true
   def init(config) do
     metrics = Map.fetch!(config, :metrics)
-    port = Map.get(config, :port, @default_port)
-    host = Map.get(config, :host, "localhost") |> to_charlist()
-    mtu = Map.get(config, :mtu, @default_mtu)
-    prefix = Map.get(config, :prefix)
 
-    case UDP.open(host, port) do
+    case UDP.open(config.host, config.port) do
       {:ok, udp} ->
         Process.flag(:trap_exit, true)
-        handler_ids = EventHandler.attach(metrics, self(), mtu, prefix, config.formatter)
-        {:ok, %{udp: udp, handler_ids: handler_ids, host: host, port: port}}
+
+        handler_ids =
+          EventHandler.attach(metrics, self(), config.mtu, config.prefix, config.formatter)
+
+        {:ok, %{udp: udp, handler_ids: handler_ids, host: config.host, port: config.port}}
 
       {:error, reason} ->
         {:error, {:udp_open_failed, reason}}
