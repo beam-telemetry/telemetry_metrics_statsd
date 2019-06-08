@@ -84,21 +84,41 @@ defmodule TelemetryMetricsStatsdTest do
     assert_reported(socket, "http.request.latency:198|ms")
   end
 
-  test "DataDog formatter can be provided" do
+  test "standard formatter can be provided explicitly" do
     {socket, port} = given_udp_port_opened()
 
     counter =
       given_counter(
         "http.requests",
         event_name: "http.request",
-        metadata: :all,
         tags: [:method, :status]
       )
 
     start_reporter(
       metrics: [counter],
       port: port,
-      formatter: TelemetryMetricsStatsd.Formatter.Datadog
+      formatter: :standard
+    )
+
+    :telemetry.execute([:http, :request], %{latency: 172}, %{method: "GET", status: 200})
+
+    assert_reported(socket, "http.requests.GET.200:1|c")
+  end
+
+  test "DataDog formatter can be used" do
+    {socket, port} = given_udp_port_opened()
+
+    counter =
+      given_counter(
+        "http.requests",
+        event_name: "http.request",
+        tags: [:method, :status]
+      )
+
+    start_reporter(
+      metrics: [counter],
+      port: port,
+      formatter: :datadog
     )
 
     :telemetry.execute([:http, :request], %{latency: 172}, %{method: "GET", status: 200})
@@ -108,6 +128,14 @@ defmodule TelemetryMetricsStatsdTest do
     assert_reported(socket, "http.requests:1|c|#method:GET,status:200")
     assert_reported(socket, "http.requests:1|c|#method:POST,status:201")
     assert_reported(socket, "http.requests:1|c|#method:GET,status:404")
+  end
+
+  test "it fails to start with invalid formatter" do
+    counter = given_counter("http.request.count")
+
+    assert_raise ArgumentError, fn ->
+      start_reporter(metrics: [counter], formatter: :my_formatter)
+    end
   end
 
   test "measurement function is taken into account when getting the value for the metric" do

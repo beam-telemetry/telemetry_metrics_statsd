@@ -171,12 +171,12 @@ defmodule TelemetryMetricsStatsd do
           | {:metrics, [Metrics.t()]}
           | {:mtu, non_neg_integer()}
           | {:prefix, prefix()}
-          | {:formatter, module()}
+          | {:formatter, :standard | :datadog}
   @type options :: [option]
 
   @default_port 8125
   @default_mtu 512
-  @default_formatter TelemetryMetricsStatsd.Formatter.Standard
+  @default_formatter :standard
 
   @doc """
   Reporter's child spec.
@@ -225,7 +225,16 @@ defmodule TelemetryMetricsStatsd do
   """
   @spec start_link(options) :: GenServer.on_start()
   def start_link(options) do
-    GenServer.start_link(__MODULE__, options)
+    config =
+      options
+      |> Enum.into(%{})
+      |> Map.update(
+        :formatter,
+        TelemetryMetricsStatsd.Formatter.Standard,
+        &validate_and_translate_formatter/1
+      )
+
+    GenServer.start_link(__MODULE__, config)
   end
 
   @doc false
@@ -241,18 +250,17 @@ defmodule TelemetryMetricsStatsd do
   end
 
   @impl true
-  def init(options) do
-    metrics = Keyword.fetch!(options, :metrics)
-    port = Keyword.get(options, :port, @default_port)
-    host = Keyword.get(options, :host, "localhost") |> to_charlist()
-    mtu = Keyword.get(options, :mtu, @default_mtu)
-    prefix = Keyword.get(options, :prefix)
-    formatter = Keyword.get(options, :formatter, @default_formatter)
+  def init(config) do
+    metrics = Map.fetch!(config, :metrics)
+    port = Map.get(config, :port, @default_port)
+    host = Map.get(config, :host, "localhost") |> to_charlist()
+    mtu = Map.get(config, :mtu, @default_mtu)
+    prefix = Map.get(config, :prefix)
 
     case UDP.open(host, port) do
       {:ok, udp} ->
         Process.flag(:trap_exit, true)
-        handler_ids = EventHandler.attach(metrics, self(), mtu, prefix, formatter)
+        handler_ids = EventHandler.attach(metrics, self(), mtu, prefix, config.formatter)
         {:ok, %{udp: udp, handler_ids: handler_ids, host: host, port: port}}
 
       {:error, reason} ->
@@ -294,4 +302,10 @@ defmodule TelemetryMetricsStatsd do
 
     :ok
   end
+
+  defp validate_and_translate_formatter(:standard), do: TelemetryMetricsStatsd.Formatter.Standard
+  defp validate_and_translate_formatter(:datadog), do: TelemetryMetricsStatsd.Formatter.Datadog
+
+  defp validate_and_translate_formatter(_),
+    do: raise(ArgumentError, ":formatter needs to be either :standard or :datadog")
 end
