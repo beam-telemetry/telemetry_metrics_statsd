@@ -164,12 +164,13 @@ defmodule TelemetryMetricsStatsd do
   alias Telemetry.Metrics
   alias TelemetryMetricsStatsd.{EventHandler, UDP}
 
+  @type prefix :: String.t() | nil
   @type option ::
           {:port, :inet.port_number()}
           | {:host, String.t()}
           | {:metrics, [Metrics.t()]}
           | {:mtu, non_neg_integer()}
-          | {:prefix, String.t() | nil}
+          | {:prefix, prefix()}
           | {:formatter, module()}
   @type options :: [option]
 
