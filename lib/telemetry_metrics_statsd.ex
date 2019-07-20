@@ -207,6 +207,7 @@ defmodule TelemetryMetricsStatsd do
           | {:mtu, non_neg_integer()}
           | {:prefix, prefix()}
           | {:formatter, :standard | :datadog}
+          | {:default_tags, Keyword.t()}
   @type options :: [option]
 
   @default_port 8125
@@ -244,6 +245,8 @@ defmodule TelemetryMetricsStatsd do
   * `:mtu` - Maximum Transmission Unit of the link between your application and the StatsD server in
     bytes. This value should not be greater than the actual MTU since this could lead to the data loss
     when the metrics are published. Defaults to `512`.
+  * `:default_tags` - Additional default tag values to be sent along with every published metric. These
+    can be overriden by tags sent via the `:telemetry.execute` call.
 
   You can read more about all the options in the `TelemetryMetricsStatsd` module documentation.
 
@@ -272,6 +275,7 @@ defmodule TelemetryMetricsStatsd do
       |> Map.put_new(:prefix, nil)
       |> Map.put_new(:formatter, @default_formatter)
       |> Map.update!(:formatter, &validate_and_translate_formatter/1)
+      |> Map.put_new(:default_tags, Keyword.new())
 
     GenServer.start_link(__MODULE__, config)
   end
@@ -297,7 +301,7 @@ defmodule TelemetryMetricsStatsd do
         Process.flag(:trap_exit, true)
 
         handler_ids =
-          EventHandler.attach(metrics, self(), config.mtu, config.prefix, config.formatter)
+          EventHandler.attach(metrics, self(), config.mtu, config.prefix, config.formatter, config.default_tags)
 
         {:ok, %{udp: udp, handler_ids: handler_ids, host: config.host, port: config.port}}
 

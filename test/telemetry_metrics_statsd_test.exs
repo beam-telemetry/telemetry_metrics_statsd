@@ -97,12 +97,13 @@ defmodule TelemetryMetricsStatsdTest do
     start_reporter(
       metrics: [counter],
       port: port,
-      formatter: :standard
+      formatter: :standard,
+      default_tags: [env: "test"]
     )
 
     :telemetry.execute([:http, :request], %{latency: 172}, %{method: "GET", status: 200})
 
-    assert_reported(socket, "http.requests.GET.200:1|c")
+    assert_reported(socket, "http.requests.test.GET.200:1|c")
   end
 
   test "DataDog formatter can be used" do
@@ -118,16 +119,17 @@ defmodule TelemetryMetricsStatsdTest do
     start_reporter(
       metrics: [counter],
       port: port,
-      formatter: :datadog
+      formatter: :datadog,
+      default_tags: [env: "test"]
     )
 
     :telemetry.execute([:http, :request], %{latency: 172}, %{method: "GET", status: 200})
     :telemetry.execute([:http, :request], %{latency: 200}, %{method: "POST", status: 201})
     :telemetry.execute([:http, :request], %{latency: 198}, %{method: "GET", status: 404})
 
-    assert_reported(socket, "http.requests:1|c|#method:GET,status:200")
-    assert_reported(socket, "http.requests:1|c|#method:POST,status:201")
-    assert_reported(socket, "http.requests:1|c|#method:GET,status:404")
+    assert_reported(socket, "http.requests:1|c|#env:test,method:GET,status:200")
+    assert_reported(socket, "http.requests:1|c|#env:test,method:POST,status:201")
+    assert_reported(socket, "http.requests:1|c|#env:test,method:GET,status:404")
   end
 
   test "it fails to start with invalid formatter" do
