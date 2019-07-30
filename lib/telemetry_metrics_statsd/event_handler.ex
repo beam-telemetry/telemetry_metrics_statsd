@@ -10,11 +10,11 @@ defmodule TelemetryMetricsStatsd.EventHandler do
           mtu :: non_neg_integer(),
           prefix :: String.t() | nil,
           formatter :: Formatter.t(),
-          default_tags :: Keyword.t()
+          global_tags :: Keyword.t()
         ) :: [
           :telemetry.handler_id()
         ]
-  def attach(metrics, reporter, mtu, prefix, formatter, default_tags) do
+  def attach(metrics, reporter, mtu, prefix, formatter, global_tags) do
     metrics_by_event = Enum.group_by(metrics, & &1.event_name)
 
     for {event_name, metrics} <- metrics_by_event do
@@ -27,7 +27,7 @@ defmodule TelemetryMetricsStatsd.EventHandler do
           mtu: mtu,
           prefix: prefix,
           formatter: formatter,
-          default_tags: default_tags
+          global_tags: global_tags
         })
 
       handler_id
@@ -49,16 +49,18 @@ defmodule TelemetryMetricsStatsd.EventHandler do
         mtu: mtu,
         prefix: prefix,
         formatter: formatter_mod,
-        default_tags: default_tags
+        global_tags: global_tags
       }) do
     packets =
       for metric <- metrics do
         case fetch_measurement(metric, measurements) do
           {:ok, value} ->
             # The order of tags needs to be preserved so that the final metric name is built correctly.
-            tag_values = metric.tag_values.(metadata)
-            event_tags = Enum.map(metric.tags, &{&1, Map.fetch!(tag_values, &1)})
-            tags = Keyword.merge(default_tags, event_tags)
+            tag_values =
+              global_tags
+              |> Map.new()
+              |> Map.merge(metric.tag_values.(metadata))
+            tags = Enum.map(metric.tags, &{&1, Map.fetch!(tag_values, &1)})
             Formatter.format(formatter_mod, metric, prefix, value, tags)
 
           :error ->
