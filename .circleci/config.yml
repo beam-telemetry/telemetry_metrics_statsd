@@ -49,6 +49,7 @@ orbs:
               key: deps-<<parameters.elixir>>-<<parameters.otp>>-{{ checksum "mix.lock" }}
               paths:
               - deps
+          - run: mix test
 
 workflows:
   build_and_test:
