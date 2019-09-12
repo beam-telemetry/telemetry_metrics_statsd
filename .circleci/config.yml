@@ -40,6 +40,7 @@ orbs:
                 - deps-<<parameters.elixir>>-<<parameters.otp>>-{{ checksum "mix.lock" }}
                 - deps-<<parameters.elixir>>-<<parameters.otp>>
           - run: mix deps.get
+          - run: mix test
           - run: mix dialyzer --halt-exit-status
           - save_cache:
               key: dialyzer-PLT-<<parameters.elixir>>-<<parameters.otp>>-{{ checksum "mix.lock" }}
