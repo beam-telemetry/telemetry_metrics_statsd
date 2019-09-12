@@ -48,7 +48,7 @@ defmodule TelemetryMetricsStatsd.MixProject do
     [
       main: "TelemetryMetricsStatsd",
       canonical: "http://hexdocs.pm/telemetry_metrics_statsd",
-      source_url: "https://github.com/arkgil/telemetry_metrics_statsd",
+      source_url: "https://github.com/beam-telemetry/telemetry_metrics_statsd",
       source_ref: "v#{@version}"
     ]
   end
@@ -63,7 +63,7 @@ defmodule TelemetryMetricsStatsd.MixProject do
     [
       maintainers: ["Arkadiusz Gil"],
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/arkgil/telemetry_metrics_statsd"}
+      links: %{"GitHub" => "https://github.com/beam-telemetry/telemetry_metrics_statsd"}
     ]
   end
 end
