@@ -61,7 +61,6 @@ defmodule TelemetryMetricsStatsd.MixProject do
 
   defp package do
     [
-      maintainers: ["Arkadiusz Gil"],
       licenses: ["MIT"],
       links: %{"GitHub" => "https://github.com/beam-telemetry/telemetry_metrics_statsd"}
     ]
