@@ -301,7 +301,14 @@ defmodule TelemetryMetricsStatsd do
         Process.flag(:trap_exit, true)
 
         handler_ids =
-          EventHandler.attach(metrics, self(), config.mtu, config.prefix, config.formatter, config.global_tags)
+          EventHandler.attach(
+            metrics,
+            self(),
+            config.mtu,
+            config.prefix,
+            config.formatter,
+            config.global_tags
+          )
 
         {:ok, %{udp: udp, handler_ids: handler_ids, host: config.host, port: config.port}}
 

@@ -60,6 +60,7 @@ defmodule TelemetryMetricsStatsd.EventHandler do
               global_tags
               |> Map.new()
               |> Map.merge(metric.tag_values.(metadata))
+
             tags = Enum.map(metric.tags, &{&1, Map.fetch!(tag_values, &1)})
             Formatter.format(formatter_mod, metric, prefix, value, tags)
 

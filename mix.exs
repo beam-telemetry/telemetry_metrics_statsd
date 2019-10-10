@@ -31,7 +31,8 @@ defmodule TelemetryMetricsStatsd.MixProject do
   defp preferred_cli_env do
     [
       docs: :docs,
-      dialyzer: :test
+      dialyzer: :test,
+      format: :test
     ]
   end
 
