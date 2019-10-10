@@ -98,19 +98,14 @@ defmodule TelemetryMetricsStatsdTest do
       metrics: [counter],
       port: port,
       formatter: :standard,
-      global_tags: [env: "test"]
+      global_tags: [env: "prod"]
     )
 
     :telemetry.execute([:http, :request], %{latency: 172}, %{method: "GET", status: 200})
+    :telemetry.execute([:http, :request], %{latency: 172}, %{method: "GET", status: 200})
 
-    :telemetry.execute([:http, :request], %{latency: 172}, %{
-      env: "dev",
-      method: "GET",
-      status: 200
-    })
-
-    assert_reported(socket, "http.requests.test.GET.200:1|c")
-    assert_reported(socket, "http.requests.dev.GET.200:1|c")
+    assert_reported(socket, "http.requests.prod.GET.200:1|c")
+    assert_reported(socket, "http.requests.prod.GET.200:1|c")
   end
 
   test "DataDog formatter can be used" do
@@ -127,23 +122,18 @@ defmodule TelemetryMetricsStatsdTest do
       metrics: [counter],
       port: port,
       formatter: :datadog,
-      global_tags: [env: "test"]
+      global_tags: [env: "prod"]
     )
 
     :telemetry.execute([:http, :request], %{latency: 172}, %{method: "GET", status: 200})
     :telemetry.execute([:http, :request], %{latency: 200}, %{method: "POST", status: 201})
     :telemetry.execute([:http, :request], %{latency: 198}, %{method: "GET", status: 404})
+    :telemetry.execute([:http, :request], %{latency: 198}, %{method: "GET", status: 404})
 
-    :telemetry.execute([:http, :request], %{latency: 198}, %{
-      env: "dev",
-      method: "GET",
-      status: 404
-    })
-
-    assert_reported(socket, "http.requests:1|c|#env:test,method:GET,status:200")
-    assert_reported(socket, "http.requests:1|c|#env:test,method:POST,status:201")
-    assert_reported(socket, "http.requests:1|c|#env:test,method:GET,status:404")
-    assert_reported(socket, "http.requests:1|c|#env:dev,method:GET,status:404")
+    assert_reported(socket, "http.requests:1|c|#env:prod,method:GET,status:200")
+    assert_reported(socket, "http.requests:1|c|#env:prod,method:POST,status:201")
+    assert_reported(socket, "http.requests:1|c|#env:prod,method:GET,status:404")
+    assert_reported(socket, "http.requests:1|c|#env:prod,method:GET,status:404")
   end
 
   test "it fails to start with invalid formatter" do
@@ -225,6 +215,80 @@ defmodule TelemetryMetricsStatsdTest do
       socket,
       "third.counter:1|c\n" <> "fourth.counter:1|c"
     )
+  end
+
+  test "global tags can be set" do
+    {socket, port} = given_udp_port_opened()
+
+    counter =
+      given_counter(
+        "http.requests",
+        event_name: "http.request",
+        tags: [:env, :host, :method, :status]
+      )
+
+    start_reporter(
+      metrics: [counter],
+      port: port,
+      formatter: :standard,
+      global_tags: [env: "dev", host: "localhost"]
+    )
+
+    :telemetry.execute([:http, :request], %{latency: 172}, %{method: "GET", status: 200})
+
+    assert_reported(socket, "http.requests.dev.localhost.GET.200:1|c")
+  end
+
+  test "event metadata overrides global tags with the same keys" do
+    {socket, port} = given_udp_port_opened()
+
+    counter =
+      given_counter(
+        "http.requests",
+        event_name: "http.request",
+        tags: [:env, :host, :method, :status]
+      )
+
+    start_reporter(
+      metrics: [counter],
+      port: port,
+      formatter: :standard,
+      global_tags: [env: "dev", host: "localhost"]
+    )
+
+    :telemetry.execute([:http, :request], %{latency: 172}, %{
+      method: "GET",
+      status: 200,
+      host: "example.com"
+    })
+
+    assert_reported(socket, "http.requests.dev.example.com.GET.200:1|c")
+  end
+
+  test "tags returned by :tag_values function override global tags with the same keys" do
+    {socket, port} = given_udp_port_opened()
+
+    counter =
+      given_counter(
+        "http.requests",
+        event_name: "http.request",
+        tags: [:env, :host, :method, :status],
+        tag_values: fn meta -> Map.put(meta, :host, "example.com") end
+      )
+
+    start_reporter(
+      metrics: [counter],
+      port: port,
+      formatter: :standard,
+      global_tags: [env: "dev", host: "localhost"]
+    )
+
+    :telemetry.execute([:http, :request], %{latency: 172}, %{
+      method: "GET",
+      status: 200
+    })
+
+    assert_reported(socket, "http.requests.dev.example.com.GET.200:1|c")
   end
 
   describe "UDP error handling" do
