@@ -23,6 +23,10 @@ orbs:
           otp:
             description: OTP release to used by the job
             type: string
+          check_format:
+            description: Verify source code format with `mix format`
+            type: boolean
+            default: false
         executor:
           name: elixir
           elixir: <<parameters.elixir>>
@@ -41,7 +45,10 @@ orbs:
                 - deps-<<parameters.elixir>>-<<parameters.otp>>
           - run: mix deps.get
           - run: mix test
-          - run: mix format --check-formatted
+          - when:
+              condition: << parameters.check_format >>
+              steps:
+                - run: mix format --check-formatted
           - run: mix dialyzer --halt-exit-status
           - save_cache:
               key: dialyzer-PLT-<<parameters.elixir>>-<<parameters.otp>>-{{ checksum "mix.lock" }}
@@ -59,6 +66,7 @@ workflows:
           name: "1.9-otp-22"
           elixir: "1.9.1"
           otp: "22"
+          check_format: true
       - telemetry_metrics_statsd/build_and_test:
           name: "1.9-otp-20"
           elixir: "1.9.1"
