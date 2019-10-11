@@ -178,6 +178,28 @@ defmodule TelemetryMetricsStatsd do
   Also note that DataDog allows measurements to be floats, that's why no rounding is performed when
   formatting the metric.
 
+  ## Global tags
+
+  The library provides an option to specify a set of global tag values, which are available to all
+  metrics running under the reporter.
+
+  For example, if you're running your application in multiple deployment environment (staging, production,
+  etc.), you might set the environment as a global tag:
+
+      TelemetryMetricsStatsd.start_link(
+        metrics: [
+          counter("http.request.count", tags: [:env])
+          ],
+          global_tags: [env: "prod"]
+      )
+
+  Note that if the global tag is to be sent with the metric, the metric needs to have it listed under the
+  `:tags` option, just like any other tag.
+
+  Also, if the same key is configured as a global tag and emitted as a part of event metadata or returned
+  by the `:tag_values` function, the metadata/`:tag_values` take precedence and override the global tag
+  value.
+
   ## Prefixing metric names
 
   Sometimes it's convenient to prefix all metric names with particular value, to group them by the
