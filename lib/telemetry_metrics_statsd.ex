@@ -41,6 +41,16 @@ defmodule TelemetryMetricsStatsd do
   The formatter can be selected using the `:formatter` option. Currently only two formats are
   supported - `:standard` and `:datadog`.
 
+  The following table shows how `Telemetry.Metrics` metrics map to StatsD metrics:
+
+  | Telemetry.Metrics | StatsD |
+  |-------------------|--------|
+  | `last_value`      | `gauge`, always set to an absolute value |
+  | `counter`         | `counter`, always increased by 1 |
+  | `sum`             | `gauge`, increased and decreased by the provided value |
+  | `summary`         | `timer` recording individual measurement |
+  | `histogram`       | Reported as histogram if DataDog formatter is used |
+
   ### The standard StatsD formatter
 
   The `:standard` formatter is compatible with the
