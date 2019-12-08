@@ -18,7 +18,7 @@ defmodule TelemetryMetricsStatsd do
   > Note that in the real project the reporter should be started under a supervisor, e.g. the main
   > supervisor of your application.
 
-  By default the reporter sends metrics to localhost:8125 - both hostname and port number can be
+  By default the reporter sends metrics to 127.0.0.1:8125 - both hostname and port number can be
   configured using the `:host` and `:port` options.
 
   Note that the reporter doesn't aggregate metrics in-process - it sends metric updates to StatsD
@@ -232,9 +232,10 @@ defmodule TelemetryMetricsStatsd do
   alias TelemetryMetricsStatsd.{EventHandler, UDP}
 
   @type prefix :: String.t() | nil
+  @type host :: String.t() | :inet.ip_address()
   @type option ::
           {:port, :inet.port_number()}
-          | {:host, String.t()}
+          | {:host, host()}
           | {:metrics, [Metrics.t()]}
           | {:mtu, non_neg_integer()}
           | {:prefix, prefix()}
@@ -268,7 +269,10 @@ defmodule TelemetryMetricsStatsd do
   The available options are:
   * `:metrics` - a list of Telemetry.Metrics metric definitions which will be published by the
     reporter
-  * `:host` - hostname of the StatsD server. Defaults to `"localhost"`.
+  * `:host` - hostname or IP address of the StatsD server. Defaults to `{127, 0, 0, 1}`. Keep
+    in mind Erlang's UDP implementation looks up the hostname each time it sends a packet.
+    Furthermore, telemetry handlers are blocking. For latency-critical applications, it is best
+    to use an IP here (or resolve it on startup).
   * `:port` - port number of the StatsD server. Defaults to `8125`.
   * `:formatter` - determines the format of the metrics sent to the target server. Can be either
     `:standard` or `:datadog`. Defaults to `:standard`.
@@ -300,8 +304,10 @@ defmodule TelemetryMetricsStatsd do
     config =
       options
       |> Enum.into(%{})
-      |> Map.put_new(:host, "localhost")
-      |> Map.update!(:host, &to_charlist/1)
+      |> Map.put_new(:host, {127, 0, 0, 1})
+      |> Map.update!(:host, fn host ->
+        if(is_binary(host), do: to_charlist(host), else: host)
+      end)
       |> Map.put_new(:port, @default_port)
       |> Map.put_new(:mtu, @default_mtu)
       |> Map.put_new(:prefix, nil)
