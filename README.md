@@ -37,7 +37,7 @@ children = [
 Supervisor.start_link(children, ...)
 ```
 
-By default the reporter sends metrics to localhost:8125 - both hostname and port number can be
+By default the reporter sends metrics to 127.0.0.1:8125 - both hostname / IP and port number can be
 configured using the `:host` and `:port` options. You can also configure the prefix for all the
 published metrics using the `:prefix` option.
 

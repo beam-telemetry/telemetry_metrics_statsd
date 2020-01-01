@@ -4,12 +4,13 @@ defmodule TelemetryMetricsStatsd.UDP do
   defstruct [:host, :port, :socket]
 
   @opaque t :: %__MODULE__{
-            host: :inet.hostname(),
+            host: :inet.hostname() | :inet.ip_address(),
             port: :inet.port_number(),
             socket: :gen_udp.socket()
           }
 
-  @spec open(:inet.hostname(), :inet.port_number()) :: {:ok, t()} | {:error, reason :: term()}
+  @spec open(:inet.hostname() | :inet.ip_address(), :inet.port_number()) ::
+          {:ok, t()} | {:error, reason :: term()}
   def open(host, port) do
     case :gen_udp.open(0) do
       {:ok, socket} ->
