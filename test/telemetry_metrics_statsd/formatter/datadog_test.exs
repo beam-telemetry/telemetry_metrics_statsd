@@ -35,6 +35,15 @@ defmodule TelemetryMetricsStatsd.Formatter.DatadogTest do
     assert format(m, 121, []) == "my.awesome.metric:121|ms"
   end
 
+  test "summary update with reporter_settings is formatted as a Datadog distribution" do
+    m = %{
+      given_summary("my.awesome.metric")
+      | reporter_options: [report_as: :datadog_distribution]
+    }
+
+    assert format(m, 121, []) == "my.awesome.metric:121|d"
+  end
+
   test "distribution update is formatted as a Datadog histogram" do
     m = given_distribution("my.awesome.metric", buckets: {0..300, 100})
 
