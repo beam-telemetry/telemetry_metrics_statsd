@@ -7,7 +7,7 @@ defmodule TelemetryMetricsStatsd.MixProject do
     [
       app: :telemetry_metrics_statsd,
       version: @version,
-      elixir: "~> 1.5",
+      elixir: "~> 1.6",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
       preferred_cli_env: preferred_cli_env(),
