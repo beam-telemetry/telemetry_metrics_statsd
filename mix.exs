@@ -7,7 +7,7 @@ defmodule TelemetryMetricsStatsd.MixProject do
     [
       app: :telemetry_metrics_statsd,
       version: @version,
-      elixir: "~> 1.5",
+      elixir: "~> 1.6",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
       preferred_cli_env: preferred_cli_env(),
@@ -38,7 +38,7 @@ defmodule TelemetryMetricsStatsd.MixProject do
 
   defp deps do
     [
-      {:telemetry_metrics, "~> 0.3"},
+      {:telemetry_metrics, "~> 0.4"},
       {:stream_data, "~> 0.4", only: :test},
       {:dialyxir, "~> 0.5", only: :test, runtime: false},
       {:ex_doc, "~> 0.19", only: :docs}
