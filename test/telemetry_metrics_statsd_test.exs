@@ -421,6 +421,29 @@ defmodule TelemetryMetricsStatsdTest do
     refute_reported(socket)
   end
 
+  test "doesn't report data for Counter metric when outside sample rate" do
+    {socket, port} = given_udp_port_opened()
+
+    counter = given_counter("http.requests", event_name: "http.request", reporter_options: [sample_rate: 0.0])
+
+    start_reporter(metrics: [counter], port: port)
+
+    :telemetry.execute([:http, :request], %{sample: 42})
+
+    refute_reported(socket)
+  end
+
+  test "doesn't report data when non-Counter metric outside sample rate" do
+    {socket, port} = given_udp_port_opened()
+    sum = given_sum("http.request.sample", reporter_options: [sample_rate: 0.0])
+
+    start_reporter(metrics: [sum], port: port)
+
+    :telemetry.execute([:http, :request], %{sample: 42})
+
+    refute_reported(socket)
+  end
+
   defp given_udp_port_opened() do
     {:ok, socket} = :gen_udp.open(0, [:binary, active: false])
     {:ok, port} = :inet.port(socket)
