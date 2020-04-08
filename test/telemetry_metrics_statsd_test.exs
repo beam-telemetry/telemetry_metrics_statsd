@@ -470,7 +470,7 @@ defmodule TelemetryMetricsStatsdTest do
 
     :telemetry.execute([:http, :request], %{sample: 42})
 
-    assert_reported(socket, "http.requests:1|c")
+    assert_reported(socket, "http.requests:1|c|@0.1")
   end
 
   test "report data when non-Counter metric inside sample rate" do
@@ -484,7 +484,7 @@ defmodule TelemetryMetricsStatsdTest do
 
     :telemetry.execute([:http, :request], %{sample: 42})
 
-    assert_reported(socket, "http.request.sample:+42|g")
+    assert_reported(socket, "http.request.sample:+42|g|@0.1")
   end
 
   defp given_udp_port_opened() do
