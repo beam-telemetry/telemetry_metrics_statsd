@@ -72,6 +72,18 @@ defmodule TelemetryMetricsStatsd.Formatter.StandardTest do
              "my.awesome.metric:132|g"
   end
 
+  test "sampling rate is added to third field" do
+    m = given_last_value("my.awesome.metric", reporter_options: [sampling_rate: 0.2])
+
+    assert format(m, 131.4, []) == "my.awesome.metric:131|g|@0.2"
+  end
+
+  test "sampling rate is ignored if == 1.0" do
+    m = given_last_value("my.awesome.metric", reporter_options: [sampling_rate: 1.0])
+
+    assert format(m, 131.4, []) == "my.awesome.metric:131|g"
+  end
+
   defp format(metric, value, tags) do
     Standard.format(metric, value, tags)
     |> :erlang.iolist_to_binary()
