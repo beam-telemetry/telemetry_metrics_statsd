@@ -227,17 +227,17 @@ defmodule TelemetryMetricsStatsd do
 
   It's not always convenient to capture every piece of data, such as in the
   case of high-traffic applications. In those cases, you may want to capture a
-  "sample" of the data. You can do this by passing `[sample_rate: <rate>]` as
+  "sample" of the data. You can do this by passing `[sampling_rate: <rate>]` as
   an option to `:reporter_options`, where "rate" is a value between 0.0 and
-  1.0. The default `:sample_rate` is 1.0.
+  1.0. The default `:sampling_rate` is 1.0.
 
   ### Example
 
       TelemetryMetricsStatsd.start_link(
         metrics: [
           counter("http.request.count"),
-          summary("http.request.duration", reporter_options: [sample_rate: 0.1]),
-          distribution("http.request.duration", buckets: [25, 50, 100, 250], reporter_options: [sample_rate: 0.1])
+          summary("http.request.duration", reporter_options: [sampling_rate: 0.1]),
+          distribution("http.request.duration", buckets: [25, 50, 100, 250], reporter_options: [sampling_rate: 0.1])
         ]
       )
 

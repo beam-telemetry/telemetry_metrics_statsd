@@ -132,7 +132,7 @@ defmodule TelemetryMetricsStatsd.EventHandler do
 
   @spec sample(Metrics.t()) :: Metrics.measurement() | nil
   defp sample(metric) do
-    rate = Keyword.get(metric.reporter_options, :sample_rate, 1.0)
+    rate = Keyword.get(metric.reporter_options, :sampling_rate, 1.0)
     sample(metric, rate, :rand.uniform_real())
   end
 

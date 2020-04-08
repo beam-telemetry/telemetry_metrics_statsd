@@ -427,7 +427,7 @@ defmodule TelemetryMetricsStatsdTest do
     counter =
       given_counter("http.requests",
         event_name: "http.request",
-        reporter_options: [sample_rate: 0.1]
+        reporter_options: [sampling_rate: 0.1]
       )
 
     # :rand.uniform_real will return 0.68352076602406
@@ -442,7 +442,7 @@ defmodule TelemetryMetricsStatsdTest do
 
   test "doesn't report data when non-Counter metric outside sample rate" do
     {socket, port} = given_udp_port_opened()
-    sum = given_sum("http.request.sample", reporter_options: [sample_rate: 0.1])
+    sum = given_sum("http.request.sample", reporter_options: [sampling_rate: 0.1])
 
     # :rand.uniform_real will return 0.68352076602406
     :rand.seed(:exs1024, {1, 2, 3})
@@ -460,7 +460,7 @@ defmodule TelemetryMetricsStatsdTest do
     counter =
       given_counter("http.requests",
         event_name: "http.request",
-        reporter_options: [sample_rate: 0.1]
+        reporter_options: [sampling_rate: 0.1]
       )
 
     # :rand.uniform_real will return 0.06947673849645647
@@ -475,7 +475,7 @@ defmodule TelemetryMetricsStatsdTest do
 
   test "report data when non-Counter metric inside sample rate" do
     {socket, port} = given_udp_port_opened()
-    sum = given_sum("http.request.sample", reporter_options: [sample_rate: 0.1])
+    sum = given_sum("http.request.sample", reporter_options: [sampling_rate: 0.1])
 
     # :rand.uniform_real will return 0.06947673849645647
     :rand.seed(:exs1024, {1, 2, 21})
