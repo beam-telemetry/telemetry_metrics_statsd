@@ -424,7 +424,9 @@ defmodule TelemetryMetricsStatsdTest do
   test "doesn't report data for Counter metric when outside sample rate" do
     {socket, port} = given_udp_port_opened()
 
-    counter = given_counter("http.requests", event_name: "http.request", reporter_options: [sample_rate: 0.0])
+    counter = given_counter("http.requests", event_name: "http.request", reporter_options: [sample_rate: 0.1])
+
+    :rand.seed(:exsss, 4) # :rand.uniform_real will return 0.8597093361595918
 
     start_reporter(metrics: [counter], port: port)
 
@@ -435,13 +437,42 @@ defmodule TelemetryMetricsStatsdTest do
 
   test "doesn't report data when non-Counter metric outside sample rate" do
     {socket, port} = given_udp_port_opened()
-    sum = given_sum("http.request.sample", reporter_options: [sample_rate: 0.0])
+    sum = given_sum("http.request.sample", reporter_options: [sample_rate: 0.1])
+
+    :rand.seed(:exsss, 4) # :rand.uniform_real will return 0.8597093361595918
 
     start_reporter(metrics: [sum], port: port)
 
     :telemetry.execute([:http, :request], %{sample: 42})
 
     refute_reported(socket)
+  end
+
+  test "report data for Counter metric when inside sample rate" do
+    {socket, port} = given_udp_port_opened()
+
+    counter = given_counter("http.requests", event_name: "http.request", reporter_options: [sample_rate: 0.1])
+
+    :rand.seed(:exsss, 6) # :rand.uniform_real will return 0.0900041117654295
+
+    start_reporter(metrics: [counter], port: port)
+
+    :telemetry.execute([:http, :request], %{sample: 42})
+
+    assert_reported(socket, "http.requests:1|c")
+  end
+
+  test "report data when non-Counter metric inside sample rate" do
+    {socket, port} = given_udp_port_opened()
+    sum = given_sum("http.request.sample", reporter_options: [sample_rate: 0.1])
+
+    :rand.seed(:exsss, 6) # :rand.uniform_real will return 0.0900041117654295
+
+    start_reporter(metrics: [sum], port: port)
+
+    :telemetry.execute([:http, :request], %{sample: 42})
+
+    assert_reported(socket, "http.request.sample:+42|g")
   end
 
   defp given_udp_port_opened() do
