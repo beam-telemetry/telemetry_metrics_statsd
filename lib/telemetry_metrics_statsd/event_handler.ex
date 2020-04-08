@@ -97,7 +97,8 @@ defmodule TelemetryMetricsStatsd.EventHandler do
   defp fetch_measurement(metric, measurements) do
     value =
       case sample(metric) do
-        nil -> nil
+        nil ->
+          nil
 
         fun when is_function(fun, 1) ->
           fun.(measurements)
@@ -132,7 +133,7 @@ defmodule TelemetryMetricsStatsd.EventHandler do
   @spec sample(Metrics.t()) :: Metrics.measurement() | nil
   defp sample(metric) do
     rate = Keyword.get(metric.reporter_options, :sample_rate, 1.0)
-    sample(metric, rate, :rand.uniform_real)
+    sample(metric, rate, :rand.uniform_real())
   end
 
   defp sample(metric, 1.0, _random_real), do: metric.measurement
