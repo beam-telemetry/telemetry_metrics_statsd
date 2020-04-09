@@ -12,7 +12,7 @@ defmodule TelemetryMetricsStatsd.Formatter.Standard do
       format_metric_tags(tags),
       ?:,
       format_metric_value(metric, value),
-      format_sampling_rate(metric.reporter_options),
+      format_sampling_rate(metric.reporter_options)
     ]
   end
 
