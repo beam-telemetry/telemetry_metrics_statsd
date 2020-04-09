@@ -26,7 +26,7 @@ defmodule TelemetryMetricsStatsd.Formatter do
   end
 
   def format(formatter, metric, prefix, measurement, tags) do
-    [prefix, ?., formatter.format(metric, measurement, tags)]
+    [to_string(prefix), ?., formatter.format(metric, measurement, tags)]
     |> :erlang.iolist_to_binary()
   end
 end
