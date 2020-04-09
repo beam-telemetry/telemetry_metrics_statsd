@@ -241,7 +241,7 @@ defmodule TelemetryMetricsStatsd do
         ]
       )
 
-  In this example, we are captureing 100% of the measurements for the counter,
+  In this example, we are capturing 100% of the measurements for the counter,
   but only 10% for both summary and distribution.
   """
 
