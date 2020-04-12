@@ -133,10 +133,10 @@ defmodule TelemetryMetricsStatsd.EventHandler do
   @spec sample(Metrics.t()) :: Metrics.measurement() | nil
   defp sample(metric) do
     rate = Keyword.get(metric.reporter_options, :sampling_rate, 1.0)
-    sample(metric, rate, :rand.uniform_real())
+    sample(metric, rate, :rand.uniform())
   end
 
-  defp sample(metric, 1.0, _random_real), do: metric.measurement
-  defp sample(metric, rate, random_real) when rate >= random_real, do: metric.measurement
+  defp sample(metric, 1.0, _random), do: metric.measurement
+  defp sample(metric, rate, random) when rate >= random, do: metric.measurement
   defp sample(_metric, _rate, _random_real), do: nil
 end

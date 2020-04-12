@@ -430,8 +430,8 @@ defmodule TelemetryMetricsStatsdTest do
         reporter_options: [sampling_rate: 0.1]
       )
 
-    # :rand.uniform_real will return 0.68352076602406
-    :rand.seed(:exs1024, {1, 2, 3})
+    # :rand.uniform_real will return 0.3280001173553174
+    :rand.seed(:exs1024, {1, 2, 2})
 
     start_reporter(metrics: [counter], port: port)
 
@@ -444,8 +444,8 @@ defmodule TelemetryMetricsStatsdTest do
     {socket, port} = given_udp_port_opened()
     sum = given_sum("http.request.sample", reporter_options: [sampling_rate: 0.1])
 
-    # :rand.uniform_real will return 0.68352076602406
-    :rand.seed(:exs1024, {1, 2, 3})
+    # :rand.uniform_real will return 0.3280001173553174
+    :rand.seed(:exs1024, {1, 2, 2})
 
     start_reporter(metrics: [sum], port: port)
 
@@ -463,8 +463,8 @@ defmodule TelemetryMetricsStatsdTest do
         reporter_options: [sampling_rate: 0.1]
       )
 
-    # :rand.uniform_real will return 0.06947673849645647
-    :rand.seed(:exs1024, {1, 2, 21})
+    # :rand.uniform_real will return 0.06907625299228148
+    :rand.seed(:exs1024, {1, 2, 3})
 
     start_reporter(metrics: [counter], port: port)
 
@@ -477,8 +477,8 @@ defmodule TelemetryMetricsStatsdTest do
     {socket, port} = given_udp_port_opened()
     sum = given_sum("http.request.sample", reporter_options: [sampling_rate: 0.1])
 
-    # :rand.uniform_real will return 0.06947673849645647
-    :rand.seed(:exs1024, {1, 2, 21})
+    # :rand.uniform_real will return 0.06907625299228148
+    :rand.seed(:exs1024, {1, 2, 3})
 
     start_reporter(metrics: [sum], port: port)
 
