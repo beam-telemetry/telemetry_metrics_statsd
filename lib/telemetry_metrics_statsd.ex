@@ -231,7 +231,7 @@ defmodule TelemetryMetricsStatsd do
   alias Telemetry.Metrics
   alias TelemetryMetricsStatsd.{EventHandler, UDP}
 
-  @type prefix :: String.t() | nil
+  @type prefix :: String.t() | atom() | nil
   @type host :: String.t() | :inet.ip_address()
   @type option ::
           {:port, :inet.port_number()}
