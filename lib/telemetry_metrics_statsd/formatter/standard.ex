@@ -11,7 +11,8 @@ defmodule TelemetryMetricsStatsd.Formatter.Standard do
       format_metric_name(metric.name),
       format_metric_tags(tags),
       ?:,
-      format_metric_value(metric, value)
+      format_metric_value(metric, value),
+      format_sampling_rate(metric.reporter_options)
     ]
   end
 
@@ -51,4 +52,11 @@ defmodule TelemetryMetricsStatsd.Formatter.Standard do
 
   defp format_metric_value(%Metrics.Sum{}, value),
     do: [value |> round() |> :erlang.integer_to_binary(), "|g"]
+
+  defp format_sampling_rate(reporter_options) do
+    case Keyword.get(reporter_options, :sampling_rate, 1.0) do
+      rate when rate > 0.0 and rate < 1.0 -> "|@#{rate}"
+      _ -> ""
+    end
+  end
 end

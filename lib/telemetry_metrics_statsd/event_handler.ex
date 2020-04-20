@@ -86,14 +86,20 @@ defmodule TelemetryMetricsStatsd.EventHandler do
 
   @spec fetch_measurement(Metrics.t(), :telemetry.event_measurements()) ::
           {:ok, number()} | :error
-  defp fetch_measurement(%Metrics.Counter{}, _measurements) do
+  defp fetch_measurement(%Metrics.Counter{} = metric, _measurements) do
     # For counter, we can ignore the measurements and just use 0.
-    {:ok, 0}
+    case sample(metric) do
+      nil -> :error
+      _ -> {:ok, 0}
+    end
   end
 
   defp fetch_measurement(metric, measurements) do
     value =
-      case metric.measurement do
+      case sample(metric) do
+        nil ->
+          nil
+
         fun when is_function(fun, 1) ->
           fun.(measurements)
 
@@ -123,4 +129,14 @@ defmodule TelemetryMetricsStatsd.EventHandler do
       end
     end)
   end
+
+  @spec sample(Metrics.t()) :: Metrics.measurement() | nil
+  defp sample(metric) do
+    rate = Keyword.get(metric.reporter_options, :sampling_rate, 1.0)
+    sample(metric, rate, :rand.uniform())
+  end
+
+  defp sample(metric, 1.0, _random), do: metric.measurement
+  defp sample(metric, rate, random) when rate >= random, do: metric.measurement
+  defp sample(_metric, _rate, _random_real), do: nil
 end

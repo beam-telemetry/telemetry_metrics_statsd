@@ -11,6 +11,7 @@ defmodule TelemetryMetricsStatsd.Formatter.Datadog do
       format_metric_name(metric.name),
       ?:,
       format_metric_value(metric, value),
+      format_sampling_rate(metric.reporter_options),
       format_metric_tags(tags)
     ]
   end
@@ -66,5 +67,12 @@ defmodule TelemetryMetricsStatsd.Formatter.Datadog do
 
   defp format_tag(k, v) do
     [:erlang.atom_to_binary(k, :utf8), ?:, to_string(v)]
+  end
+
+  defp format_sampling_rate(reporter_options) do
+    case Keyword.get(reporter_options, :sampling_rate, 1.0) do
+      rate when rate > 0.0 and rate < 1.0 -> "|@#{rate}"
+      _ -> ""
+    end
   end
 end

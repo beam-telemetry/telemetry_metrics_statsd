@@ -72,6 +72,18 @@ defmodule TelemetryMetricsStatsd.Formatter.DatadogTest do
              "my.awesome.metric:131.5|g"
   end
 
+  test "sampling rate is added to third field" do
+    m = given_last_value("my.awesome.metric", reporter_options: [sampling_rate: 0.2])
+
+    assert format(m, 131.4, []) == "my.awesome.metric:131.4|g|@0.2"
+  end
+
+  test "sampling rate is ignored if == 1.0" do
+    m = given_last_value("my.awesome.metric", reporter_options: [sampling_rate: 1.0])
+
+    assert format(m, 131.4, []) == "my.awesome.metric:131.4|g"
+  end
+
   defp format(metric, value, tags) do
     Datadog.format(metric, value, tags)
     |> :erlang.iolist_to_binary()

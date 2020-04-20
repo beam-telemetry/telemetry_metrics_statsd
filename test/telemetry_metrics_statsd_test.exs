@@ -421,6 +421,72 @@ defmodule TelemetryMetricsStatsdTest do
     refute_reported(socket)
   end
 
+  test "doesn't report data for Counter metric when outside sample rate" do
+    {socket, port} = given_udp_port_opened()
+
+    counter =
+      given_counter("http.requests",
+        event_name: "http.request",
+        reporter_options: [sampling_rate: 0.1]
+      )
+
+    # :rand.uniform_real will return 0.3280001173553174
+    :rand.seed(:exs1024, {1, 2, 2})
+
+    start_reporter(metrics: [counter], port: port)
+
+    :telemetry.execute([:http, :request], %{sample: 42})
+
+    refute_reported(socket)
+  end
+
+  test "doesn't report data when non-Counter metric outside sample rate" do
+    {socket, port} = given_udp_port_opened()
+    sum = given_sum("http.request.sample", reporter_options: [sampling_rate: 0.1])
+
+    # :rand.uniform_real will return 0.3280001173553174
+    :rand.seed(:exs1024, {1, 2, 2})
+
+    start_reporter(metrics: [sum], port: port)
+
+    :telemetry.execute([:http, :request], %{sample: 42})
+
+    refute_reported(socket)
+  end
+
+  test "report data for Counter metric when inside sample rate" do
+    {socket, port} = given_udp_port_opened()
+
+    counter =
+      given_counter("http.requests",
+        event_name: "http.request",
+        reporter_options: [sampling_rate: 0.1]
+      )
+
+    # :rand.uniform_real will return 0.06907625299228148
+    :rand.seed(:exs1024, {1, 2, 3})
+
+    start_reporter(metrics: [counter], port: port)
+
+    :telemetry.execute([:http, :request], %{sample: 42})
+
+    assert_reported(socket, "http.requests:1|c|@0.1")
+  end
+
+  test "report data when non-Counter metric inside sample rate" do
+    {socket, port} = given_udp_port_opened()
+    sum = given_sum("http.request.sample", reporter_options: [sampling_rate: 0.1])
+
+    # :rand.uniform_real will return 0.06907625299228148
+    :rand.seed(:exs1024, {1, 2, 3})
+
+    start_reporter(metrics: [sum], port: port)
+
+    :telemetry.execute([:http, :request], %{sample: 42})
+
+    assert_reported(socket, "http.request.sample:+42|g|@0.1")
+  end
+
   defp given_udp_port_opened() do
     {:ok, socket} = :gen_udp.open(0, [:binary, active: false])
     {:ok, port} = :inet.port(socket)
