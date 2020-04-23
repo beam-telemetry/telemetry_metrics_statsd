@@ -23,6 +23,19 @@ defmodule TelemetryMetricsStatsd.Formatter.DatadogTest do
     assert format(m, -21, []) == "my.awesome.metric:-21|g"
   end
 
+  test "positive sum update as counter is formatted as a Datadog counter with n value" do
+    m = %{given_sum("my.awesome.metric") | reporter_options: [report_as: :counter]}
+
+    assert format(m, 21, []) == "my.awesome.metric:21|c"
+  end
+
+  @tag capture_log: true
+  test "negative sum update as counter for Datadog is dropped" do
+    m = %{given_sum("my.awesome.metric") | reporter_options: [report_as: :counter]}
+
+    assert format(m, -21, []) == ""
+  end
+
   test "last_value update is formatted as a Datadog gauge with absolute value" do
     m = given_last_value("my.awesome.metric")
 

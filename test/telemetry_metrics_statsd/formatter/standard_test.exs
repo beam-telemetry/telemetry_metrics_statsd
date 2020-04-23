@@ -23,6 +23,19 @@ defmodule TelemetryMetricsStatsd.Formatter.StandardTest do
     assert format(m, -21, []) == "my.awesome.metric:-21|g"
   end
 
+  test "positive sum as counter update is formatted as a StatsD counter with n value" do
+    m = %{given_sum("my.awesome.metric") | reporter_options: [report_as: :counter]}
+
+    assert format(m, 21, []) == "my.awesome.metric:21|c"
+  end
+
+  @tag capture_log: true
+  test "negative sum as counter update is dropped" do
+    m = %{given_sum("my.awesome.metric") | reporter_options: [report_as: :counter]}
+
+    assert format(m, -21, []) == ""
+  end
+
   test "last_value update is formatted as a StatsD gauge with absolute value" do
     m = given_last_value("my.awesome.metric")
 

@@ -47,7 +47,7 @@ defmodule TelemetryMetricsStatsd do
   |-------------------|--------|
   | `last_value`      | `gauge`, always set to an absolute value |
   | `counter`         | `counter`, always increased by 1 |
-  | `sum`             | `gauge`, increased and decreased by the provided value |
+  | `sum`             | `gauge`, increased and decreased by the provided value, or `counter`, set to the provided value |
   | `summary`         | `timer` recording individual measurement |
   | `histogram`       | Reported as histogram if DataDog formatter is used |
 
@@ -124,6 +124,22 @@ defmodule TelemetryMetricsStatsd do
       "http.request.count:+1076|g"
 
   When the measurement is negative, the StatsD gauge is decreased accordingly.
+
+  When the `report_as: :counter` reporter option is passed, the Sum metric is reported as
+  a counter, and set to the value provided. Negative values are not supported
+  and will be logged and dropped in this case.
+
+  Given the metric definition
+
+      sum("kafka.consume.batch_size", reporter_options: [report_as: :counter])
+
+  and the event
+
+      :telemetry.execute([:kafka, :consume], %{batch_size: 200})
+
+  the following would be sent to StatsD
+
+      "kafka.consume.batch_size:200|c"
 
   #### Summary
 
