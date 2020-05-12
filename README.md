@@ -65,6 +65,8 @@ children = [
 Supervisor.start_link(children, ...)
 ```
 
+To use [Datadog's distributions metric type](https://docs.datadoghq.com/metrics/distributions/), add `formatter_options: [report_as: :distribution]` to your metric.
+
 ## Installation
 
 Just add the reporter to your dependencies in `mix.exs`:

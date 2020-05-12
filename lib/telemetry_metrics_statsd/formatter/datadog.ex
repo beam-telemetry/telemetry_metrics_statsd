@@ -34,8 +34,15 @@ defmodule TelemetryMetricsStatsd.Formatter.Datadog do
 
   defp format_metric_value(%Metrics.Counter{}, _value), do: "1|c"
 
-  defp format_metric_value(%Metrics.Summary{}, value),
-    do: [format_number(value), "|ms"]
+  defp format_metric_value(
+         %Metrics.Summary{reporter_options: reporter_options},
+         value
+       ) do
+    case Keyword.get(reporter_options, :report_as) do
+      :datadog_distribution -> [format_number(value), "|d"]
+      _ -> [format_number(value), "|ms"]
+    end
+  end
 
   defp format_metric_value(%Metrics.Distribution{}, value),
     do: [format_number(value), "|h"]
