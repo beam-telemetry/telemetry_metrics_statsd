@@ -126,8 +126,8 @@ defmodule TelemetryMetricsStatsd do
   When the measurement is negative, the StatsD gauge is decreased accordingly.
 
   When the `report_as: :counter` reporter option is passed, the Sum metric is reported as
-  a counter, and set to the value provided. Negative values are not supported
-  and will be logged and dropped in this case.
+  a counter, and updated with the value provided. Negative values are not supported
+  and will are logged and dropped.
 
   Given the metric definition
 
@@ -176,6 +176,17 @@ defmodule TelemetryMetricsStatsd do
 
   Since histograms are configured on the StatsD server side, the `:buckets` option has no effect
   when used with this reporter.
+
+  If you're using the [DataDog formatter](#module-the-datadog-formatter), you can provide
+  a `report_as: :datadog_distribution` reporter option to the metric definition, so that
+  the metric is reported as a [DataDog Distribution](https://docs.datadoghq.com/metrics/distributions/)
+  instead of a regular StatsD timer:
+
+        distribution(
+          "http.request.duration",
+          buckets: [0],
+          reporter_options: [report_as: :datadog_distribution]
+        )
 
   ### The DataDog formatter
 
@@ -241,11 +252,11 @@ defmodule TelemetryMetricsStatsd do
 
   ## Sampling data
 
-  It's not always convenient to capture every piece of data, such as in the
-  case of high-traffic applications. In those cases, you may want to capture a
-  "sample" of the data. You can do this by passing `[sampling_rate: <rate>]` as
-  an option to `:reporter_options`, where "rate" is a value between 0.0 and
-  1.0. The default `:sampling_rate` is 1.0.
+  It's not always convenient to capture every piece of data, such as in the case of high-traffic
+  applications. In those cases, you may want to capture a "sample" of the data. You can do this
+  by passing `[sampling_rate: <rate>]` as an option to `:reporter_options`, where `rate` is a
+  value between 0.0 and 1.0. The default `:sampling_rate` is 1.0, which means that all
+  the measurements are being captured.
 
   ### Example
 
@@ -257,8 +268,8 @@ defmodule TelemetryMetricsStatsd do
         ]
       )
 
-  In this example, we are capturing 100% of the measurements for the counter,
-  but only 10% for both summary and distribution.
+  In this example, we are capturing 100% of the measurements for the counter, but only 10% for both
+  summary and distribution.
   """
 
   use GenServer
