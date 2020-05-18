@@ -41,15 +41,26 @@ defmodule TelemetryMetricsStatsd do
   The formatter can be selected using the `:formatter` option. Currently only two formats are
   supported - `:standard` and `:datadog`.
 
-  The following table shows how `Telemetry.Metrics` metrics map to StatsD metrics:
+  The following table shows how `Telemetry.Metrics` metrics map to standard StatsD metrics:
 
   | Telemetry.Metrics | StatsD |
   |-------------------|--------|
-  | `last_value`      | `gauge`, always set to an absolute value |
-  | `counter`         | `counter`, always increased by 1 |
-  | `sum`             | `gauge`, increased and decreased by the provided value, or `counter`, set to the provided value |
-  | `summary`         | `timer` recording individual measurement |
-  | `histogram`       | Reported as histogram if DataDog formatter is used |
+  | `last_value`      | `gauge` |
+  | `counter`         | `counter` |
+  | `sum`             | `gauge` or `counter` |
+  | `summary`         | `timer` |
+  | `distribution`    | `timer` |
+
+  [DataDog](https://docs.datadoghq.com/developers/metrics/types/?tab=count#metric-types) provides a richer
+  set of metric types:
+
+  | Telemetry.Metrics | DogStatsD |
+  |-------------------|-----------|
+  | `last_value`      | `gauge` |
+  | `counter`         | `counter` |
+  | `sum`             | `gauge` or `counter` |
+  | `summary`         | `histogram`  |
+  | `distribution`    | `distribution` |
 
   ### The standard StatsD formatter
 
@@ -125,9 +136,9 @@ defmodule TelemetryMetricsStatsd do
 
   When the measurement is negative, the StatsD gauge is decreased accordingly.
 
-  When the `report_as: :counter` reporter option is passed, the Sum metric is reported as
-  a counter, and updated with the value provided. Negative values are not supported
-  and will are logged and dropped.
+  When the `report_as: :counter` reporter option is passed, the sum metric is reported as
+  a counter and increased with the value provided. Only positive values are allowed, negative
+  measurements are discarded and logged.
 
   Given the metric definition
 
@@ -164,7 +175,7 @@ defmodule TelemetryMetricsStatsd do
   Because of that, the distribution is also reported as a timer. For example, given the following metric
   definition
 
-      distribution("http.request.duration", buckets: [0])
+      distribution("http.request.duration")
 
   and the event
 
@@ -173,20 +184,6 @@ defmodule TelemetryMetricsStatsd do
   the following line would be send to StatsD
 
       "http.request.duration:120|ms"
-
-  Since histograms are configured on the StatsD server side, the `:buckets` option has no effect
-  when used with this reporter.
-
-  If you're using the [DataDog formatter](#module-the-datadog-formatter), you can provide
-  a `report_as: :datadog_distribution` reporter option to the metric definition, so that
-  the metric is reported as a [DataDog Distribution](https://docs.datadoghq.com/metrics/distributions/)
-  instead of a regular StatsD timer:
-
-        distribution(
-          "http.request.duration",
-          buckets: [0],
-          reporter_options: [report_as: :datadog_distribution]
-        )
 
   ### The DataDog formatter
 
@@ -208,9 +205,17 @@ defmodule TelemetryMetricsStatsd do
 
   #### Metric types
 
-  The only difference between DataDog and standard StatsD metric types is that DataDog provides
-  a dedicated histogram metric. That's why Telemetry.Metrics distribution is translated to DataDog
-  histogram.
+  There is no difference in how the counter, last value, and sum metrics are handled between
+  the standard and DataDog formatters.
+
+  The summary metric is reported as [DataDog
+  histogram](https://docs.datadoghq.com/developers/metrics/types/?tab=histogram), as that is the
+  metric that provides a set of statistics about gathered measurments on the DataDog side.
+
+  The distribution is flushed as [DataDog
+  distribution](https://docs.datadoghq.com/developers/metrics/types/?tab=distribution) metric, which
+  provides statistically correct aggregations of data gathered from multiple services or DogStatsD
+  agents.
 
   Also note that DataDog allows measurements to be floats, that's why no rounding is performed when
   formatting the metric.

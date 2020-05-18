@@ -42,22 +42,16 @@ defmodule TelemetryMetricsStatsd.Formatter.DatadogTest do
     assert format(m, -18, []) == "my.awesome.metric:-18|g"
   end
 
-  test "summary update is formatted as a Datadog timer" do
+  test "summary update is formatted as a Datadog histogram" do
     m = given_summary("my.awesome.metric")
 
-    assert format(m, 121, []) == "my.awesome.metric:121|ms"
-  end
-
-  test "summary update with reporter_settings is formatted as a Datadog distribution" do
-    m = given_summary("my.awesome.metric", reporter_options: [report_as: :datadog_distribution])
-
-    assert format(m, 121, []) == "my.awesome.metric:121|d"
+    assert format(m, 121, []) == "my.awesome.metric:121|h"
   end
 
   test "distribution update is formatted as a Datadog histogram" do
-    m = given_distribution("my.awesome.metric", buckets: {0..300, 100})
+    m = given_distribution("my.awesome.metric")
 
-    assert format(m, 131, []) == "my.awesome.metric:131|h"
+    assert format(m, 131, []) == "my.awesome.metric:131|d"
   end
 
   test "StatsD metric name is based on metric name and tags" do
