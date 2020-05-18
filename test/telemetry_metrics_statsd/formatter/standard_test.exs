@@ -49,7 +49,7 @@ defmodule TelemetryMetricsStatsd.Formatter.StandardTest do
   end
 
   test "distribution update is formatted as a StatsD timer" do
-    m = given_distribution("my.awesome.metric", buckets: {0..300, 100})
+    m = given_distribution("my.awesome.metric")
 
     assert format(m, 131, []) == "my.awesome.metric:131|ms"
   end

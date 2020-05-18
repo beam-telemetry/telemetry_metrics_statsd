@@ -269,7 +269,7 @@ defmodule TelemetryMetricsStatsd do
         metrics: [
           counter("http.request.count"),
           summary("http.request.duration", reporter_options: [sampling_rate: 0.1]),
-          distribution("http.request.duration", buckets: [25, 50, 100, 250], reporter_options: [sampling_rate: 0.1])
+          distribution("http.request.duration", reporter_options: [sampling_rate: 0.1])
         ]
       )
 

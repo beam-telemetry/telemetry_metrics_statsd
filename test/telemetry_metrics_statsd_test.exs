@@ -67,11 +67,7 @@ defmodule TelemetryMetricsStatsdTest do
   test "distribution metric is reported as StastD timer" do
     {socket, port} = given_udp_port_opened()
 
-    dist =
-      given_distribution(
-        "http.request.latency",
-        buckets: [0, 100, 200, 300]
-      )
+    dist = given_distribution("http.request.latency")
 
     start_reporter(metrics: [dist], port: port)
 
@@ -162,11 +158,7 @@ defmodule TelemetryMetricsStatsdTest do
   test "there can be multiple metrics derived from the same event" do
     {socket, port} = given_udp_port_opened()
 
-    dist =
-      given_distribution(
-        "http.request.latency",
-        buckets: [0, 100, 200, 300]
-      )
+    dist = given_distribution("http.request.latency")
 
     sum = given_sum("http.request.payload_size")
 
@@ -336,7 +328,7 @@ defmodule TelemetryMetricsStatsdTest do
 
     metrics = [
       given_counter("http.request.count"),
-      given_distribution("http.request.latency", buckets: [0, 100, 200]),
+      given_distribution("http.request.latency"),
       given_last_value("http.request.current_memory"),
       given_sum("http.request.payload_size")
     ]
