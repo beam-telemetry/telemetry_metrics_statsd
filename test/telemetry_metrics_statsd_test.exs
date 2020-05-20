@@ -446,7 +446,7 @@ defmodule TelemetryMetricsStatsdTest do
     refute_reported(socket)
   end
 
-  test "report data for Counter metric when inside sample rate" do
+  test "reports data for Counter metric when inside sample rate" do
     {socket, port} = given_udp_port_opened()
 
     counter =
@@ -465,7 +465,7 @@ defmodule TelemetryMetricsStatsdTest do
     assert_reported(socket, "http.requests:1|c|@0.1")
   end
 
-  test "report data when non-Counter metric inside sample rate" do
+  test "reports data when non-Counter metric inside sample rate" do
     {socket, port} = given_udp_port_opened()
     sum = given_sum("http.request.sample", reporter_options: [sampling_rate: 0.1])
 
@@ -477,6 +477,23 @@ defmodule TelemetryMetricsStatsdTest do
     :telemetry.execute([:http, :request], %{sample: 42})
 
     assert_reported(socket, "http.request.sample:+42|g|@0.1")
+  end
+
+  test "respects :keep and :drop options" do
+    {socket, port} = given_udp_port_opened()
+    counter = given_counter("http.request.count", keep: &match?(%{keep: true}, &1))
+    summary = given_summary("http.request.duration", drop: &match?(%{drop: true}, &1))
+
+    start_reporter(metrics: [counter, summary], port: port)
+
+    :telemetry.execute([:http, :request], %{duration: 10}, %{keep: true})
+    assert_reported(socket, "http.request.count:1|c\n" <> "http.request.duration:10|ms")
+
+    :telemetry.execute([:http, :request], %{duration: 10}, %{keep: true, drop: true})
+    assert_reported(socket, "http.request.count:1|c")
+
+    :telemetry.execute([:http, :request], %{duration: 10}, %{drop: true})
+    refute_reported(socket)
   end
 
   defp given_udp_port_opened() do

@@ -53,19 +53,17 @@ defmodule TelemetryMetricsStatsd.EventHandler do
       }) do
     packets =
       for metric <- metrics do
-        case fetch_measurement(metric, measurements) do
-          {:ok, value} ->
-            # The order of tags needs to be preserved so that the final metric name is built correctly.
-            tag_values =
-              global_tags
-              |> Map.new()
-              |> Map.merge(metric.tag_values.(metadata))
+        if value = keep?(metric, metadata) && fetch_measurement(metric, measurements) do
+          # The order of tags needs to be preserved so that the final metric name is built correctly.
+          tag_values =
+            global_tags
+            |> Map.new()
+            |> Map.merge(metric.tag_values.(metadata))
 
-            tags = Enum.map(metric.tags, &{&1, Map.fetch!(tag_values, &1)})
-            Formatter.format(formatter_mod, metric, prefix, value, tags)
-
-          :error ->
-            :nopublish
+          tags = Enum.map(metric.tags, &{&1, Map.fetch!(tag_values, &1)})
+          Formatter.format(formatter_mod, metric, prefix, value, tags)
+        else
+          :nopublish
         end
       end
       |> Enum.filter(fn l -> l != :nopublish end)
@@ -84,13 +82,16 @@ defmodule TelemetryMetricsStatsd.EventHandler do
     {__MODULE__, reporter, event_name}
   end
 
-  @spec fetch_measurement(Metrics.t(), :telemetry.event_measurements()) ::
-          {:ok, number()} | :error
+  @spec keep?(Metrics.t(), :telemetry.event_metadata()) :: boolean()
+  defp keep?(%{keep: nil}, _metadata), do: true
+  defp keep?(%{keep: keep}, metadata), do: keep.(metadata)
+
+  @spec fetch_measurement(Metrics.t(), :telemetry.event_measurements()) :: number() | nil
   defp fetch_measurement(%Metrics.Counter{} = metric, _measurements) do
     # For counter, we can ignore the measurements and just use 0.
     case sample(metric) do
-      nil -> :error
-      _ -> {:ok, 0}
+      nil -> nil
+      _ -> 0
     end
   end
 
@@ -108,9 +109,9 @@ defmodule TelemetryMetricsStatsd.EventHandler do
       end
 
     if is_number(value) do
-      {:ok, value}
+      value
     else
-      :error
+      nil
     end
   end
 
