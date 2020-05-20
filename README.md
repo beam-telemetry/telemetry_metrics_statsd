@@ -72,7 +72,7 @@ Just add the reporter to your dependencies in `mix.exs`:
 ```elixir
 defp deps do
   [
-    {:telemetry_metrics_statsd, "~> 0.3.0"}
+    {:telemetry_metrics_statsd, "~> 0.4.0"}
   ]
 end
 ```
