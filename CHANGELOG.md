@@ -6,20 +6,20 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [0.4.0](https://github.com/beam-telemetry/telemetry_metrics_statsd/tree/v0.4.0)
 
-This release is by far the most feature rich version of the reporter. This wouldn't be possible without the amazing contributions we received! 💛
+This release is by far the most feature rich update of the reporter. This wouldn't be possible without the amazing contributions we received! 💛
 
 See the documentation for the new version at https://hexdocs.pm/telemetry_metrics_statsd/0.4.0.
 
 ### Highlights
 
-The reporter is now compatible with `Telemetry.Metrics` 0.5.0, which means that it respects the `:keep` and `:drop` options set on metrics.
-The `:buckets` option on distribution metric is no longer required and it can be safely removed from these metric definitions (the option was redundant for the StatsD reporter since the beginning).
+The reporter is now compatible with Telemetry.Metrics 0.5.0, which means that it respects the `:keep` and `:drop` options set on metrics.
+The `:buckets` option on distribution metrics is no longer required and it can be safely removed from these metric definitions (the option was redundant for the StatsD reporter since the beginning).
 
-If you are running in a high volume environment, you can now set the sampling rate of each metric via the `:sampling_rate` reporter option.
+If you are running reporter in a high volume environment, you can now set the sampling rate of each metric via the `:sampling_rate` reporter option, to limit the number of metric updates sent to the StatsD daemon.
 
 And last but not least, we have a few enhancements in how Telemetry.Metrics map to metric types in StatsD/DataDog:
 
-- Both formats now support exporting sum metric as a monotonically increasing counter (via `report_as: :counter` reporter option.
+- Both formats now support exporting sum metric as a monotonically increasing counter (via `report_as: :counter` reporter option).
 - For DataDog, summary is now exported as a [histogram](https://docs.datadoghq.com/developers/metrics/types/?tab=histogram#metric-types), while distribution maps to [DataDog distribution](https://docs.datadoghq.com/developers/metrics/types/?tab=distribution#metric-types) metric.
 
 ### Complete list of changes
