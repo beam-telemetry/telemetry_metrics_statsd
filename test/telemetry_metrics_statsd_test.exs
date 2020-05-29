@@ -323,6 +323,19 @@ defmodule TelemetryMetricsStatsdTest do
     end
   end
 
+  describe "Unix domain socket support" do
+    test "reporter connects to a Unix domain socket" do
+      {socket, socket_path} = given_unix_socket_opened()
+      counter = given_counter("http.request.count")
+
+      start_reporter(metrics: [counter], socket_path: socket_path)
+
+      :telemetry.execute([:http, :request], %{latency: 213})
+
+      assert_reported(socket, "http.requests:1|c")
+    end
+  end
+
   test "published metrics are prefixed with the provided prefix" do
     {socket, port} = given_udp_port_opened()
 
@@ -500,6 +513,13 @@ defmodule TelemetryMetricsStatsdTest do
     {:ok, socket} = :gen_udp.open(0, [:binary, active: false])
     {:ok, port} = :inet.port(socket)
     {socket, port}
+  end
+
+  defp given_unix_socket_opened() do
+    socket_name = :crypto.strong_rand_bytes(50) |> Base.encode16(case: :lower)
+    socket_path = Path.join("/tmp", socket_name)
+    {:ok, socket} = :gen_udp.open(0, [:binary, active: false, ifaddr: {:local, socket_path}])
+    {socket, socket_path}
   end
 
   defp start_reporter(options) do
