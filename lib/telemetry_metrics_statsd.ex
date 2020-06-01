@@ -21,6 +21,22 @@ defmodule TelemetryMetricsStatsd do
   By default the reporter sends metrics to 127.0.0.1:8125 - both hostname and port number can be
   configured using the `:host` and `:port` options.
 
+      TelemetryMetricsStatsd.start_link(
+        metrics: metrics,
+        host: "statsd",
+        port: 1234
+      )
+
+  Alternatively, a Unix domain socket path can be provided using the `:socket_path` option.
+
+      TelemetryMetricsStatsd.start_link(
+        metrics: metrics,
+        socket_path: "/var/run/statsd.sock"
+      )
+
+  If the `:socket_path` option is provided, `:host` and `:port` parameters are ignored and the
+  connection is established exclusively via Unix domain socket.
+
   Note that the reporter doesn't aggregate metrics in-process - it sends metric updates to StatsD
   whenever a relevant Telemetry event is emitted.
 
