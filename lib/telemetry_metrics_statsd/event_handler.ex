@@ -139,7 +139,7 @@ defmodule TelemetryMetricsStatsd.EventHandler do
 
   defp sample(metric, 1.0), do: metric.measurement
   defp sample(metric, rate), do: sample(metric, rate, :rand.uniform())
-  
+
   defp sample(metric, rate, random) when rate >= random, do: metric.measurement
   defp sample(_metric, _rate, _random_real), do: nil
 end
