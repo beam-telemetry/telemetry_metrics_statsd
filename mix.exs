@@ -56,7 +56,7 @@ defmodule TelemetryMetricsStatsd.MixProject do
 
   defp description do
     """
-    Telemetry.Metrics reporter for StastD-compatible metric servers
+    Telemetry.Metrics reporter for StatsD-compatible metric servers
     """
   end
 

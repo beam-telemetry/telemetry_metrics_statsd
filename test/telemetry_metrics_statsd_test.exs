@@ -49,7 +49,7 @@ defmodule TelemetryMetricsStatsdTest do
     assert_reported(socket, "vm.memory.total:1872|g")
   end
 
-  test "summary metric is reported as StastD timer" do
+  test "summary metric is reported as StatsD timer" do
     {socket, port} = given_udp_port_opened()
     summary = given_summary("http.request.latency")
 
@@ -64,7 +64,7 @@ defmodule TelemetryMetricsStatsdTest do
     assert_reported(socket, "http.request.latency:198|ms")
   end
 
-  test "distribution metric is reported as StastD timer" do
+  test "distribution metric is reported as StatsD timer" do
     {socket, port} = given_udp_port_opened()
 
     dist = given_distribution("http.request.latency")
