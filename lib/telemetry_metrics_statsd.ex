@@ -21,6 +21,22 @@ defmodule TelemetryMetricsStatsd do
   By default the reporter sends metrics to 127.0.0.1:8125 - both hostname and port number can be
   configured using the `:host` and `:port` options.
 
+      TelemetryMetricsStatsd.start_link(
+        metrics: metrics,
+        host: "statsd",
+        port: 1234
+      )
+
+  Alternatively, a Unix domain socket path can be provided using the `:socket_path` option.
+
+      TelemetryMetricsStatsd.start_link(
+        metrics: metrics,
+        socket_path: "/var/run/statsd.sock"
+      )
+
+  If the `:socket_path` option is provided, `:host` and `:port` parameters are ignored and the
+  connection is established exclusively via Unix domain socket.
+
   Note that the reporter doesn't aggregate metrics in-process - it sends metric updates to StatsD
   whenever a relevant Telemetry event is emitted.
 
@@ -364,6 +380,7 @@ defmodule TelemetryMetricsStatsd do
       |> Map.put_new(:port, @default_port)
       |> Map.put_new(:mtu, @default_mtu)
       |> Map.put_new(:prefix, nil)
+      |> Map.put_new(:socket_path, nil)
       |> Map.put_new(:formatter, @default_formatter)
       |> Map.update!(:formatter, &validate_and_translate_formatter/1)
       |> Map.put_new(:global_tags, Keyword.new())
@@ -387,7 +404,13 @@ defmodule TelemetryMetricsStatsd do
   def init(config) do
     metrics = Map.fetch!(config, :metrics)
 
-    case UDP.open(config.host, config.port) do
+    udp_config =
+      case config.socket_path do
+        nil -> Map.take(config, [:host, :port])
+        socket_path -> %{socket_path: socket_path}
+      end
+
+    case UDP.open(udp_config) do
       {:ok, udp} ->
         Process.flag(:trap_exit, true)
 
@@ -401,7 +424,7 @@ defmodule TelemetryMetricsStatsd do
             config.global_tags
           )
 
-        {:ok, %{udp: udp, handler_ids: handler_ids, host: config.host, port: config.port}}
+        {:ok, %{udp: udp, udp_config: udp_config, handler_ids: handler_ids}}
 
       {:error, reason} ->
         {:error, {:udp_open_failed, reason}}
@@ -417,7 +440,7 @@ defmodule TelemetryMetricsStatsd do
   def handle_cast({:udp_error, udp, reason}, %{udp: udp} = state) do
     Logger.error("Failed to publish metrics over UDP: #{inspect(reason)}")
 
-    case UDP.open(state.host, state.port) do
+    case UDP.open(state.udp_config) do
       {:ok, udp} ->
         {:noreply, %{state | udp: udp}}
 
