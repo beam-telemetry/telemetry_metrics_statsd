@@ -47,4 +47,9 @@ defmodule TelemetryMetricsStatsd.UDP do
       :gen_udp.send(socket, host, port, data)
     end
   end
+
+  @spec close(t()) :: :ok
+  def close(%__MODULE__{socket: socket}) do
+    :gen_udp.close(socket)
+  end
 end
