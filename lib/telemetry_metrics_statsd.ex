@@ -441,8 +441,9 @@ defmodule TelemetryMetricsStatsd do
     Logger.error("Failed to publish metrics over UDP: #{inspect(reason)}")
 
     case UDP.open(state.udp_config) do
-      {:ok, udp} ->
-        {:noreply, %{state | udp: udp}}
+      {:ok, new_udp} ->
+        UDP.close(udp)
+        {:noreply, %{state | udp: new_udp}}
 
       {:error, reason} ->
         Logger.error("Failed to reopen UDP socket: #{inspect(reason)}")

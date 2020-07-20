@@ -284,7 +284,7 @@ defmodule TelemetryMetricsStatsdTest do
   end
 
   describe "UDP error handling" do
-    test "notifying a UDP error logs an error" do
+    test "reporting a UDP error logs an error" do
       reporter = start_reporter(metrics: [])
       udp = TelemetryMetricsStatsd.get_udp(reporter)
 
@@ -296,7 +296,7 @@ defmodule TelemetryMetricsStatsdTest do
              end) =~ ~r/\[error\] Failed to publish metrics over UDP: :closed/
     end
 
-    test "notifying a UDP error for the same socket multiple times generates only one log" do
+    test "reporting a UDP error for the same socket multiple times generates only one log" do
       reporter = start_reporter(metrics: [])
       udp = TelemetryMetricsStatsd.get_udp(reporter)
 
@@ -312,7 +312,7 @@ defmodule TelemetryMetricsStatsdTest do
     end
 
     @tag :capture_log
-    test "notifying a UDP error and fetching a socket returns a new socket" do
+    test "reporting a UDP error and fetching a socket returns a new socket" do
       reporter = start_reporter(metrics: [])
       udp = TelemetryMetricsStatsd.get_udp(reporter)
 
@@ -320,6 +320,17 @@ defmodule TelemetryMetricsStatsdTest do
       new_udp = TelemetryMetricsStatsd.get_udp(reporter)
 
       assert new_udp != udp
+    end
+
+    @tag :capture_log
+    test "reporting a UDP error and opening a new socket closes the old socket" do
+      reporter = start_reporter(metrics: [])
+      udp = TelemetryMetricsStatsd.get_udp(reporter)
+
+      TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
+      Process.sleep(100)
+
+      assert :gen_udp.recv(udp.socket, 0) == {:error, :closed}
     end
   end
 
