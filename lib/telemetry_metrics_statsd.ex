@@ -352,6 +352,7 @@ defmodule TelemetryMetricsStatsd do
     when the metrics are published. Defaults to `512`.
   * `:global_tags` - Additional default tag values to be sent along with every published metric. These
     can be overriden by tags sent via the `:telemetry.execute` call.
+  * `:pool_size` - The number of UDP ports to open to report metrics. Defaults to `1`
 
   You can read more about all the options in the `TelemetryMetricsStatsd` module documentation.
 
@@ -384,14 +385,19 @@ defmodule TelemetryMetricsStatsd do
       |> Map.put_new(:formatter, @default_formatter)
       |> Map.update!(:formatter, &validate_and_translate_formatter/1)
       |> Map.put_new(:global_tags, Keyword.new())
+      |> Map.put_new(:pool_size, 1)
 
     GenServer.start_link(__MODULE__, config)
   end
 
   @doc false
   @spec get_udp(pid()) :: UDP.t()
-  def get_udp(reporter) do
-    GenServer.call(reporter, :get_udp)
+  def get_udp(_reporter) do
+    udps = :ets.lookup(__MODULE__, :udp)
+
+    udps
+    |> Enum.random()
+    |> elem(1)
   end
 
   @doc false
@@ -402,6 +408,7 @@ defmodule TelemetryMetricsStatsd do
 
   @impl true
   def init(config) do
+    Process.flag(:trap_exit, true)
     metrics = Map.fetch!(config, :metrics)
 
     udp_config =
@@ -410,49 +417,50 @@ defmodule TelemetryMetricsStatsd do
         socket_path -> %{socket_path: socket_path}
       end
 
-    case UDP.open(udp_config) do
-      {:ok, udp} ->
-        Process.flag(:trap_exit, true)
+    udps =
+      for _ <- 1..config.pool_size do
+        {:ok, udp} = UDP.open(udp_config)
+        {:udp, udp}
+      end
 
-        handler_ids =
-          EventHandler.attach(
-            metrics,
-            self(),
-            config.mtu,
-            config.prefix,
-            config.formatter,
-            config.global_tags
-          )
+    :ets.new(__MODULE__, [:bag, :protected, :named_table, read_concurrency: true])
+    :ets.insert(__MODULE__, udps)
 
-        {:ok, %{udp: udp, udp_config: udp_config, handler_ids: handler_ids}}
+    handler_ids =
+      EventHandler.attach(
+        metrics,
+        self(),
+        config.mtu,
+        config.prefix,
+        config.formatter,
+        config.global_tags
+      )
 
-      {:error, reason} ->
-        {:error, {:udp_open_failed, reason}}
-    end
+    {:ok, %{udp_config: udp_config, handler_ids: handler_ids}}
   end
 
   @impl true
-  def handle_call(:get_udp, _from, state) do
-    {:reply, state.udp, state}
-  end
+  def handle_cast({:udp_error, old_udp, reason}, state) do
+    udps = :ets.lookup(__MODULE__, :udp)
+    old_entry = {:udp, old_udp}
 
-  @impl true
-  def handle_cast({:udp_error, udp, reason}, %{udp: udp} = state) do
-    Logger.error("Failed to publish metrics over UDP: #{inspect(reason)}")
+    if Enum.find(udps, fn entry -> entry == old_entry end) do
+      Logger.error("Failed to publish metrics over UDP: #{inspect(reason)}")
+      UDP.close(old_udp)
+      :ets.delete_object(__MODULE__, old_entry)
 
-    case UDP.open(state.udp_config) do
-      {:ok, new_udp} ->
-        UDP.close(udp)
-        {:noreply, %{state | udp: new_udp}}
+      case UDP.open(state.udp_config) do
+        {:ok, udp} ->
+          :ets.insert(__MODULE__, {:udp, udp})
+          {:noreply, state}
 
-      {:error, reason} ->
-        Logger.error("Failed to reopen UDP socket: #{inspect(reason)}")
-        {:stop, {:udp_open_failed, reason}, state}
+        {:error, reason} ->
+          Logger.error("Failed to reopen UDP socket: #{inspect(reason)}")
+          {:stop, {:udp_open_failed, reason}, state}
+      end
+    else
+      {:noreply, state}
     end
-  end
-
-  def handle_cast({:udp_error, _, _}, state) do
-    {:noreply, state}
   end
 
   @impl true

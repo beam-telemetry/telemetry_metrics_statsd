@@ -317,6 +317,7 @@ defmodule TelemetryMetricsStatsdTest do
       udp = TelemetryMetricsStatsd.get_udp(reporter)
 
       TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
+      Process.sleep(100)
       new_udp = TelemetryMetricsStatsd.get_udp(reporter)
 
       assert new_udp != udp
@@ -518,6 +519,17 @@ defmodule TelemetryMetricsStatsdTest do
 
     :telemetry.execute([:http, :request], %{duration: 10}, %{drop: true})
     refute_reported(socket)
+  end
+
+  test "it supports a pool of reporter ports" do
+    reporter = start_reporter(metrics: [], pool_size: 4)
+
+    udps =
+      for _ <- 1..50, uniq: true do
+        TelemetryMetricsStatsd.get_udp(reporter)
+      end
+
+    assert length(udps) == 4
   end
 
   defp given_udp_port_opened() do
