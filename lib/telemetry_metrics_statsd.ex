@@ -402,13 +402,19 @@ defmodule TelemetryMetricsStatsd do
   end
 
   @doc false
-  @spec get_udp(pid()) :: UDP.t()
-  def get_udp(_reporter) do
-    udps = :ets.lookup(__MODULE__, :udp)
+  @spec get_udp(:ets.tid()) :: UDP.t()
+  def get_udp(pool_id) do
+    udps = :ets.lookup(pool_id, :udp)
 
     udps
     |> Enum.random()
     |> elem(1)
+  end
+
+  @doc false
+  @spec get_pool_id(pid()) :: :ets.tid()
+  def get_pool_id(reporter) do
+    GenServer.call(reporter, :get_pool_id)
   end
 
   @doc false
@@ -434,35 +440,36 @@ defmodule TelemetryMetricsStatsd do
         {:udp, udp}
       end
 
-    :ets.new(__MODULE__, [:bag, :protected, :named_table, read_concurrency: true])
-    :ets.insert(__MODULE__, udps)
+    pool_id = :ets.new(__MODULE__, [:bag, :protected, read_concurrency: true])
+    :ets.insert(pool_id, udps)
 
     handler_ids =
       EventHandler.attach(
         metrics,
         self(),
+        pool_id,
         config.mtu,
         config.prefix,
         config.formatter,
         config.global_tags
       )
 
-    {:ok, %{udp_config: udp_config, handler_ids: handler_ids}}
+    {:ok, %{udp_config: udp_config, handler_ids: handler_ids, pool_id: pool_id}}
   end
 
   @impl true
-  def handle_cast({:udp_error, old_udp, reason}, state) do
-    udps = :ets.lookup(__MODULE__, :udp)
+  def handle_cast({:udp_error, old_udp, reason}, %{pool_id: pool_id} = state) do
+    udps = :ets.lookup(pool_id, :udp)
     old_entry = {:udp, old_udp}
 
     if Enum.find(udps, fn entry -> entry == old_entry end) do
       Logger.error("Failed to publish metrics over UDP: #{inspect(reason)}")
       UDP.close(old_udp)
-      :ets.delete_object(__MODULE__, old_entry)
+      :ets.delete_object(pool_id, old_entry)
 
       case UDP.open(state.udp_config) do
         {:ok, udp} ->
-          :ets.insert(__MODULE__, {:udp, udp})
+          :ets.insert(pool_id, {:udp, udp})
           {:noreply, state}
 
         {:error, reason} ->
@@ -472,6 +479,11 @@ defmodule TelemetryMetricsStatsd do
     else
       {:noreply, state}
     end
+  end
+
+  @impl true
+  def handle_call(:get_pool_id, _from, %{pool_id: pool_id} = state) do
+    {:reply, pool_id, state}
   end
 
   @impl true

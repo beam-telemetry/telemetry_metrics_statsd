@@ -287,46 +287,50 @@ defmodule TelemetryMetricsStatsdTest do
   describe "UDP error handling" do
     test "reporting a UDP error logs an error" do
       reporter = start_reporter(metrics: [])
-      udp = TelemetryMetricsStatsd.get_udp(reporter)
+      pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
+      udp = TelemetryMetricsStatsd.get_udp(pool_id)
 
       assert capture_log(fn ->
                TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
                # errors.
-               eventually(fn -> TelemetryMetricsStatsd.get_udp(reporter) != udp end)
+               eventually(fn -> TelemetryMetricsStatsd.get_udp(pool_id) != udp end)
              end) =~ ~r/\[error\] Failed to publish metrics over UDP: :closed/
     end
 
     test "reporting a UDP error for the same socket multiple times generates only one log" do
       reporter = start_reporter(metrics: [])
-      udp = TelemetryMetricsStatsd.get_udp(reporter)
+      pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
+      udp = TelemetryMetricsStatsd.get_udp(pool_id)
 
       assert capture_log(fn ->
                TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
-               eventually(fn -> TelemetryMetricsStatsd.get_udp(reporter) != udp end)
+               eventually(fn -> TelemetryMetricsStatsd.get_udp(pool_id) != udp end)
              end) =~ ~r/\[error\] Failed to publish metrics over UDP: :closed/
 
       assert capture_log(fn ->
                TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
-               eventually(fn -> TelemetryMetricsStatsd.get_udp(reporter) != udp end)
+               eventually(fn -> TelemetryMetricsStatsd.get_udp(pool_id) != udp end)
              end) == ""
     end
 
     @tag :capture_log
     test "reporting a UDP error and fetching a socket returns a new socket" do
       reporter = start_reporter(metrics: [], pool_size: 1)
-      udp = TelemetryMetricsStatsd.get_udp(reporter)
+      pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
+      udp = TelemetryMetricsStatsd.get_udp(pool_id)
 
       TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
-      assert eventually(fn -> TelemetryMetricsStatsd.get_udp(reporter) != udp end)
+      assert eventually(fn -> TelemetryMetricsStatsd.get_udp(pool_id) != udp end)
     end
 
     @tag :capture_log
     test "reporting a UDP error and opening a new socket closes the old socket" do
       reporter = start_reporter(metrics: [])
-      udp = TelemetryMetricsStatsd.get_udp(reporter)
+      pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
+      udp = TelemetryMetricsStatsd.get_udp(pool_id)
 
       TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
-      eventually(fn -> TelemetryMetricsStatsd.get_udp(reporter) != udp end)
+      eventually(fn -> TelemetryMetricsStatsd.get_udp(pool_id) != udp end)
 
       assert :gen_udp.recv(udp.socket, 0) == {:error, :closed}
     end
@@ -520,13 +524,27 @@ defmodule TelemetryMetricsStatsdTest do
 
   test "it supports a pool of sockets" do
     reporter = start_reporter(metrics: [], pool_size: 4)
+    pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
 
     udps =
       for _ <- 1..50, uniq: true do
-        TelemetryMetricsStatsd.get_udp(reporter)
+        TelemetryMetricsStatsd.get_udp(pool_id)
       end
 
     assert length(udps) == 4
+  end
+
+  test "multiple reporters can be started" do
+    {socket, port} = given_udp_port_opened()
+    counter = given_counter("http.requests", event_name: "http.request")
+
+    start_reporter(metrics: [counter], port: port)
+    start_reporter(metrics: [counter], port: port)
+
+    :telemetry.execute([:http, :request], %{latency: 211})
+
+    assert_reported(socket, "http.requests:1|c")
+    assert_reported(socket, "http.requests:1|c")
   end
 
   defp given_udp_port_opened() do
@@ -549,7 +567,7 @@ defmodule TelemetryMetricsStatsdTest do
 
   defp assert_reported(socket, expected_payload) do
     expected_size = byte_size(expected_payload)
-    {:ok, {_host, _port, payload}} = :gen_udp.recv(socket, expected_size)
+    {:ok, {_host, _port, payload}} = :gen_udp.recv(socket, expected_size, 1000)
     assert payload == expected_payload
   end
 
