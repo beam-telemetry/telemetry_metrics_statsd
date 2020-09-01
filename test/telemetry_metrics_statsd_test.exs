@@ -291,7 +291,6 @@ defmodule TelemetryMetricsStatsdTest do
 
       assert capture_log(fn ->
                TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
-               # Can we do better here? We could use `call` instead of `cast` for reporting socket
                # errors.
                eventually(fn -> TelemetryMetricsStatsd.get_udp(reporter) != udp end)
              end) =~ ~r/\[error\] Failed to publish metrics over UDP: :closed/
