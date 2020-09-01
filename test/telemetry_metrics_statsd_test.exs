@@ -2,7 +2,8 @@ defmodule TelemetryMetricsStatsdTest do
   use ExUnit.Case, async: true
 
   import ExUnit.CaptureLog
-  import TelemetryMetricsStatsd.Test.{Helpers, WaitUntil}
+  import TelemetryMetricsStatsd.Test.Helpers
+  import Liveness
 
   test "counter metric is reported as StatsD counter with 1 as a value" do
     {socket, port} = given_udp_port_opened()
@@ -292,7 +293,7 @@ defmodule TelemetryMetricsStatsdTest do
                TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
                # Can we do better here? We could use `call` instead of `cast` for reporting socket
                # errors.
-               Process.sleep(100)
+               eventually(fn -> TelemetryMetricsStatsd.get_udp(reporter) != udp end)
              end) =~ ~r/\[error\] Failed to publish metrics over UDP: :closed/
     end
 
@@ -302,25 +303,22 @@ defmodule TelemetryMetricsStatsdTest do
 
       assert capture_log(fn ->
                TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
-               Process.sleep(100)
+               eventually(fn -> TelemetryMetricsStatsd.get_udp(reporter) != udp end)
              end) =~ ~r/\[error\] Failed to publish metrics over UDP: :closed/
 
       assert capture_log(fn ->
                TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
-               Process.sleep(100)
+               eventually(fn -> TelemetryMetricsStatsd.get_udp(reporter) != udp end)
              end) == ""
     end
 
     @tag :capture_log
     test "reporting a UDP error and fetching a socket returns a new socket" do
-      reporter = start_reporter(metrics: [])
+      reporter = start_reporter(metrics: [], pool_size: 1)
       udp = TelemetryMetricsStatsd.get_udp(reporter)
 
       TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
-      Process.sleep(100)
-      new_udp = TelemetryMetricsStatsd.get_udp(reporter)
-
-      assert new_udp != udp
+      assert eventually(fn -> TelemetryMetricsStatsd.get_udp(reporter) != udp end)
     end
 
     @tag :capture_log
@@ -329,7 +327,7 @@ defmodule TelemetryMetricsStatsdTest do
       udp = TelemetryMetricsStatsd.get_udp(reporter)
 
       TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
-      Process.sleep(100)
+      eventually(fn -> TelemetryMetricsStatsd.get_udp(reporter) != udp end)
 
       assert :gen_udp.recv(udp.socket, 0) == {:error, :closed}
     end
@@ -387,7 +385,7 @@ defmodule TelemetryMetricsStatsdTest do
 
     # Make sure that event handlers are detached even if non-parent process sends an exit signal.
     spawn(fn -> Process.exit(reporter, :some_reason) end)
-    wait_until(fn -> not Process.alive?(reporter) end)
+    eventually(fn -> not Process.alive?(reporter) end)
 
     assert :telemetry.list_handlers([:first, :event]) == []
     assert :telemetry.list_handlers([:second, :event]) == []
