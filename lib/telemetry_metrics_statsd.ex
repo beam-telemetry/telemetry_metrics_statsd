@@ -40,6 +40,17 @@ defmodule TelemetryMetricsStatsd do
   Note that the reporter doesn't aggregate metrics in-process - it sends metric updates to StatsD
   whenever a relevant Telemetry event is emitted.
 
+  By default, the reporter sends metrics through a single socket. To reduce contention when there are
+  many metrics to be sent, more sockets can be configured to be opened through the `pool_size` option.
+
+      TelemetryMetricsStatsd.start_link(
+        metrics: metrics,
+        pool_size: 10
+      )
+
+  When the `pool_size` is bigger than 1, the sockets are randomly selected out of the pool each time
+  they need to be used
+
   ## Translation between Telemetry.Metrics and StatsD
 
   In this section we walk through how the Telemetry.Metrics metric definitions are mapped to StatsD

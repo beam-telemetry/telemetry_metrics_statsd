@@ -519,7 +519,7 @@ defmodule TelemetryMetricsStatsdTest do
     refute_reported(socket)
   end
 
-  test "it supports a pool of reporter ports" do
+  test "it supports a pool of sockets" do
     reporter = start_reporter(metrics: [], pool_size: 4)
 
     udps =
