@@ -410,7 +410,7 @@ defmodule TelemetryMetricsStatsdTest do
     {:ok, supervisor} =
       Supervisor.start_link(
         [
-          Supervisor.Spec.worker(TelemetryMetricsStatsd, [[metrics: metrics, port: port]])
+          {TelemetryMetricsStatsd, [metrics: metrics, port: port]}
         ],
         strategy: :one_for_one
       )
