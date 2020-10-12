@@ -322,7 +322,7 @@ defmodule TelemetryMetricsStatsd do
           | {:formatter, :standard | :datadog}
           | {:global_tags, Keyword.t()}
           | {:name, atom()}
-          | {:sync_send, boolean()}
+          | {:async_send, boolean()}
   @type options :: [option]
 
   @default_port 8125
@@ -399,7 +399,7 @@ defmodule TelemetryMetricsStatsd do
       |> Map.update!(:formatter, &validate_and_translate_formatter/1)
       |> Map.put_new(:global_tags, Keyword.new())
       |> Map.put_new(:pool_size, 1)
-      |> Map.put_new(:sync_send, false)
+      |> Map.put_new(:aasync_send, false)
 
     gen_server_opts =
       case Map.get(config, :name) do
@@ -473,7 +473,7 @@ defmodule TelemetryMetricsStatsd do
         config.prefix,
         config.formatter,
         config.global_tags,
-        config.sync_send
+        config.async_send
       )
 
     {:ok, %{udp_config: udp_config, handler_ids: handler_ids, pool_id: pool_id}}

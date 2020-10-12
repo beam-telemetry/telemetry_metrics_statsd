@@ -391,7 +391,7 @@ defmodule TelemetryMetricsStatsdTest do
       port: port,
       metrics: [counter],
       name: :my_statsd,
-      sync_send: true
+      async_send: true
     )
 
     :telemetry.execute([:http, :request], %{latency: 213})
