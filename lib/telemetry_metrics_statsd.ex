@@ -399,7 +399,7 @@ defmodule TelemetryMetricsStatsd do
       |> Map.update!(:formatter, &validate_and_translate_formatter/1)
       |> Map.put_new(:global_tags, Keyword.new())
       |> Map.put_new(:pool_size, 1)
-      |> Map.put_new(:aasync_send, false)
+      |> Map.put_new(:async_send, false)
 
     gen_server_opts =
       case Map.get(config, :name) do
