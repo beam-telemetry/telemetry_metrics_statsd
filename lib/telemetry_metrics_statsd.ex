@@ -321,6 +321,8 @@ defmodule TelemetryMetricsStatsd do
           | {:prefix, prefix()}
           | {:formatter, :standard | :datadog}
           | {:global_tags, Keyword.t()}
+          | {:name, atom()}
+          | {:sync_send, boolean()}
   @type options :: [option]
 
   @default_port 8125
@@ -397,8 +399,15 @@ defmodule TelemetryMetricsStatsd do
       |> Map.update!(:formatter, &validate_and_translate_formatter/1)
       |> Map.put_new(:global_tags, Keyword.new())
       |> Map.put_new(:pool_size, 1)
+      |> Map.put_new(:sync_send, false)
 
-    GenServer.start_link(__MODULE__, config)
+    gen_server_opts =
+      case Map.get(config, :name) do
+        nil -> []
+        name -> [name: name]
+      end
+
+    GenServer.start_link(__MODULE__, config, gen_server_opts)
   end
 
   @doc false
@@ -421,6 +430,18 @@ defmodule TelemetryMetricsStatsd do
   @spec udp_error(pid(), UDP.t(), reason :: term) :: :ok
   def udp_error(reporter, udp, reason) do
     GenServer.cast(reporter, {:udp_error, udp, reason})
+  end
+
+  @doc false
+  @spec dispatch_metric(pid(), metric :: term) :: :ok
+  def dispatch_metric(reporter, metric) do
+    GenServer.cast(reporter, {:dispatch, metric})
+  end
+
+  @doc "Update the StatsD host the exporter is sending the metrics to."
+  @spec update_host(GenServer.name() | pid(), host(), port() | nil) :: :ok
+  def update_host(reporter, host, port \\ nil) do
+    GenServer.call(reporter, {:update_host, host, port})
   end
 
   @impl true
@@ -451,7 +472,8 @@ defmodule TelemetryMetricsStatsd do
         config.mtu,
         config.prefix,
         config.formatter,
-        config.global_tags
+        config.global_tags,
+        config.sync_send
       )
 
     {:ok, %{udp_config: udp_config, handler_ids: handler_ids, pool_id: pool_id}}
@@ -479,6 +501,45 @@ defmodule TelemetryMetricsStatsd do
     else
       {:noreply, state}
     end
+  end
+
+  def handle_cast({:dispatch, packets}, %{pool_id: pool_id} = state) do
+    udp = get_udp(pool_id)
+
+    Enum.reduce_while(packets, :cont, fn packet, :cont ->
+      case UDP.send(udp, packet) do
+        :ok ->
+          {:cont, :cont}
+
+        {:error, reason} ->
+          udp_error(self(), udp, reason)
+          {:halt, :halt}
+      end
+    end)
+
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_call(
+        {:update_host, new_host, port},
+        _from,
+        %{pool_id: pool_id, udp_config: %{port: old_port}} = state
+      ) do
+    new_port =
+      if is_nil(port),
+        do: old_port,
+        else: port
+
+    pool_id
+    |> :ets.tab2list()
+    |> Enum.each(fn {:udp, udp} ->
+      :ets.delete_object(pool_id, {:udp, udp})
+      updated_udp = UDP.update(udp, new_host, new_port)
+      :ets.insert(pool_id, {:udp, updated_udp})
+    end)
+
+    {:reply, :ok, %{state | udp_config: %{host: new_host, port: new_port}}}
   end
 
   @impl true

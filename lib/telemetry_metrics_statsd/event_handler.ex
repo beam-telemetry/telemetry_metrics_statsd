@@ -11,11 +11,12 @@ defmodule TelemetryMetricsStatsd.EventHandler do
           mtu :: non_neg_integer(),
           prefix :: String.t() | nil,
           formatter :: Formatter.t(),
-          global_tags :: Keyword.t()
+          global_tags :: Keyword.t(),
+          sync_send :: boolean()
         ) :: [
           :telemetry.handler_id()
         ]
-  def attach(metrics, reporter, pool_id, mtu, prefix, formatter, global_tags) do
+  def attach(metrics, reporter, pool_id, mtu, prefix, formatter, global_tags, sync_send) do
     metrics_by_event = Enum.group_by(metrics, & &1.event_name)
 
     for {event_name, metrics} <- metrics_by_event do
@@ -29,7 +30,8 @@ defmodule TelemetryMetricsStatsd.EventHandler do
           mtu: mtu,
           prefix: prefix,
           formatter: formatter,
-          global_tags: global_tags
+          global_tags: global_tags,
+          sync_send: sync_send
         })
 
       handler_id
@@ -52,7 +54,8 @@ defmodule TelemetryMetricsStatsd.EventHandler do
         mtu: mtu,
         prefix: prefix,
         formatter: formatter_mod,
-        global_tags: global_tags
+        global_tags: global_tags,
+        sync_send: sync_send
       }) do
     packets =
       for metric <- metrics do
@@ -74,6 +77,9 @@ defmodule TelemetryMetricsStatsd.EventHandler do
     case packets do
       [] ->
         :ok
+
+      packets when sync_send ->
+        sync_publish_metrics(reporter, Packet.build_packets(packets, mtu, "\n"))
 
       packets ->
         publish_metrics(reporter, pool_id, Packet.build_packets(packets, mtu, "\n"))
@@ -116,6 +122,11 @@ defmodule TelemetryMetricsStatsd.EventHandler do
     else
       nil
     end
+  end
+
+  @spec sync_publish_metrics(pid(), [binary()]) :: :ok
+  defp sync_publish_metrics(reporter, packets) do
+    TelemetryMetricsStatsd.dispatch_metric(reporter, packets)
   end
 
   @spec publish_metrics(pid(), :ets.tid(), [binary()]) :: :ok
