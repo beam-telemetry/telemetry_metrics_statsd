@@ -42,15 +42,11 @@ defmodule TelemetryMetricsStatsd.Formatter.Datadog do
   defp format_metric_value(%Metrics.LastValue{}, value),
     do: [format_number(value), "|g"]
 
-  defp format_metric_value(%Metrics.Sum{reporter_options: reporter_options} = sum, value) do
-    case Keyword.get(reporter_options, :report_as) do
-      :counter -> format_counter_metric_value(sum, value)
-      _ -> format_sum_metric_value(sum, value)
-    end
+  defp format_metric_value(%Metrics.Sum{} = sum, value) do
+    format_counter_metric_value(sum, value)
   end
 
-  defp format_counter_metric_value(%Metrics.Sum{}, value) when value >= 0,
-    do: [format_number(value), "|c"]
+  defp format_counter_metric_value(%Metrics.Sum{}, value), do: [format_number(value), "|c"]
 
   defp format_counter_metric_value(%Metrics.Sum{}, value) do
     Logger.warn(
