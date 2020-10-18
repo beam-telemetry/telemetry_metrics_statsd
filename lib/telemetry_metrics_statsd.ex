@@ -367,8 +367,8 @@ defmodule TelemetryMetricsStatsd do
     can be overriden by tags sent via the `:telemetry.execute` call.
   * `:pool_size` - The number of UDP ports to open to report metrics. Defaults to `1`
   * `:dns_polling_period` - When set makes `TelemetryMetricsStatsd` resolve the hostname of the StatsD server
-    on the specified interval. Defaults to `nil` disabling DNS resolution. This can improve performance of UDP
-    sending, while still allowing for dynamic resolution e.g. in a Kubernetes environment.
+    on the specified interval in milliseconds. Defaults to `nil` disabling DNS resolution. This can improve 
+    performance of UDP sending, while still allowing for dynamic resolution e.g. in a Kubernetes environment.
 
   You can read more about all the options in the `TelemetryMetricsStatsd` module documentation.
 
