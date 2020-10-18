@@ -321,6 +321,8 @@ defmodule TelemetryMetricsStatsd do
           | {:prefix, prefix()}
           | {:formatter, :standard | :datadog}
           | {:global_tags, Keyword.t()}
+          | {:name, atom()}
+          | {:dns_polling_period, non_neg_integer()}
   @type options :: [option]
 
   @default_port 8125
@@ -398,7 +400,13 @@ defmodule TelemetryMetricsStatsd do
       |> Map.put_new(:global_tags, Keyword.new())
       |> Map.put_new(:pool_size, 1)
 
-    GenServer.start_link(__MODULE__, config)
+    gen_server_opts =
+      case Map.get(config, :name) do
+        nil -> []
+        name -> [name: name]
+      end
+
+    GenServer.start_link(__MODULE__, config, gen_server_opts)
   end
 
   @doc false
@@ -423,6 +431,12 @@ defmodule TelemetryMetricsStatsd do
     GenServer.cast(reporter, {:udp_error, udp, reason})
   end
 
+  @doc "Update the StatsD host the exporter is sending the metrics to."
+  @spec update_host(GenServer.name() | pid(), host(), port() | nil) :: :ok
+  def update_host(reporter, host, port \\ nil) do
+    GenServer.call(reporter, {:update_host, host, port})
+  end
+
   @impl true
   def init(config) do
     Process.flag(:trap_exit, true)
@@ -430,7 +444,7 @@ defmodule TelemetryMetricsStatsd do
 
     udp_config =
       case config.socket_path do
-        nil -> Map.take(config, [:host, :port])
+        nil -> setup_dns_resolution(config)
         socket_path -> %{socket_path: socket_path}
       end
 
@@ -440,7 +454,13 @@ defmodule TelemetryMetricsStatsd do
         {:udp, udp}
       end
 
-    pool_id = :ets.new(__MODULE__, [:bag, :protected, read_concurrency: true])
+    pool_name =
+      case Map.get(config, :name) do
+        nil -> __MODULE__
+        name -> name
+      end
+
+    pool_id = :ets.new(pool_name, [:bag, :protected, read_concurrency: true])
     :ets.insert(pool_id, udps)
 
     handler_ids =
@@ -454,7 +474,16 @@ defmodule TelemetryMetricsStatsd do
         config.global_tags
       )
 
-    {:ok, %{udp_config: udp_config, handler_ids: handler_ids, pool_id: pool_id}}
+    {:ok,
+     %{
+       udp_config: udp_config,
+       handler_ids: handler_ids,
+       pool_id: pool_id,
+       dns_config: %{
+         original_host: config[:host],
+         polling_period: config[:dns_polling_period]
+       }
+     }}
   end
 
   @impl true
@@ -487,8 +516,48 @@ defmodule TelemetryMetricsStatsd do
   end
 
   @impl true
+  def handle_call(
+        {:update_host, new_host, new_port},
+        _from,
+        %{udp_config: %{port: old_port}} = state
+      ) do
+    port =
+      if is_nil(new_port),
+        do: old_port,
+        else: new_port
+
+    {:reply, :ok, update_statsd_host(state, new_host, port)}
+  end
+
+  @impl true
   def handle_info({:EXIT, _pid, reason}, state) do
     {:stop, reason, state}
+  end
+
+  @impl true
+  def handle_info(:dns_poll, %{dns_config: %{original_host: {_, _, _, _}}} = state) do
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info(
+        :dns_poll,
+        %{
+          udp_config: %{host: current_host, port: port},
+          dns_config: %{original_host: host, polling_period: period}
+        } = state
+      ) do
+    new_state =
+      case :inet.getaddr(host, :inet) do
+        {:ok, ^current_host} ->
+          state
+
+        {:ok, new_host} ->
+          update_statsd_host(state, new_host, port)
+      end
+
+    Process.send_after(self(), :dns_poll, period)
+    {:noreply, new_state}
   end
 
   @impl true
@@ -498,9 +567,59 @@ defmodule TelemetryMetricsStatsd do
     :ok
   end
 
+  defp update_statsd_host(
+         %{pool_id: pool_id} = state,
+         {_, _, _, _} = new_host,
+         new_port
+       ) do
+    update_pool(pool_id, new_host, new_port)
+
+    %{state | udp_config: %{host: new_host, port: new_port}}
+  end
+
+  defp update_statsd_host(
+         %{pool_id: pool_id, dns_config: dns_config} = state,
+         new_host_string,
+         new_port
+       ) do
+    new_host = to_charlist(new_host_string)
+
+    update_pool(pool_id, new_host, new_port)
+
+    %{
+      state
+      | udp_config: %{host: new_host, port: new_port},
+        dns_config: %{dns_config | original_host: new_host}
+    }
+  end
+
   defp validate_and_translate_formatter(:standard), do: TelemetryMetricsStatsd.Formatter.Standard
   defp validate_and_translate_formatter(:datadog), do: TelemetryMetricsStatsd.Formatter.Datadog
 
   defp validate_and_translate_formatter(_),
     do: raise(ArgumentError, ":formatter needs to be either :standard or :datadog")
+
+  defp setup_dns_resolution(%{host: {_, _, _, _} = host, port: port}) do
+    %{host: host, port: port}
+  end
+
+  defp setup_dns_resolution(%{dns_polling_period: period, host: host, port: port}) do
+    {:ok, ip} = :inet.getaddr(host, :inet)
+    Process.send_after(self(), :dns_poll, period)
+    %{host: ip, port: port}
+  end
+
+  defp setup_dns_resolution(%{host: host, port: port}) do
+    %{host: host, port: port}
+  end
+
+  defp update_pool(pool_id, new_host, new_port) do
+    pool_id
+    |> :ets.tab2list()
+    |> Enum.each(fn {:udp, udp} ->
+      :ets.delete_object(pool_id, {:udp, udp})
+      updated_udp = UDP.update(udp, new_host, new_port)
+      :ets.insert(pool_id, {:udp, updated_udp})
+    end)
+  end
 end
