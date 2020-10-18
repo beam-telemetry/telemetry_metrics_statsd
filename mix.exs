@@ -12,7 +12,7 @@ defmodule TelemetryMetricsStatsd.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       preferred_cli_env: preferred_cli_env(),
       deps: deps(),
-      dialyzer: [ignore_warnings: ".dialyzer_ignore"],
+      dialyzer: [ignore_warnings: ".dialyzer_ignore", plt_ignore_apps: [:mock]],
       docs: docs(),
       description: description(),
       package: package()
