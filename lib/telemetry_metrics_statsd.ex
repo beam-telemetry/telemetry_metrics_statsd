@@ -367,7 +367,7 @@ defmodule TelemetryMetricsStatsd do
     can be overriden by tags sent via the `:telemetry.execute` call.
   * `:pool_size` - The number of UDP ports to open to report metrics. Defaults to `1`
   * `:dns_polling_period` - When set makes `TelemetryMetricsStatsd` resolve the hostname of the StatsD server
-    on the specified interval in milliseconds. Defaults to `nil` disabling DNS resolution. This can improve 
+    on the specified interval in milliseconds. Defaults to `nil` disabling DNS resolution. This can improve
     performance of UDP sending, while still allowing for dynamic resolution e.g. in a Kubernetes environment.
 
   You can read more about all the options in the `TelemetryMetricsStatsd` module documentation.
@@ -432,12 +432,6 @@ defmodule TelemetryMetricsStatsd do
   @spec udp_error(pid(), UDP.t(), reason :: term) :: :ok
   def udp_error(reporter, udp, reason) do
     GenServer.cast(reporter, {:udp_error, udp, reason})
-  end
-
-  @doc "Update the StatsD host the exporter is sending the metrics to."
-  @spec update_host(GenServer.name() | pid(), host(), port() | nil) :: :ok
-  def update_host(reporter, host, port \\ nil) do
-    GenServer.call(reporter, {:update_host, host, port})
   end
 
   @impl true
@@ -516,20 +510,6 @@ defmodule TelemetryMetricsStatsd do
   @impl true
   def handle_call(:get_pool_id, _from, %{pool_id: pool_id} = state) do
     {:reply, pool_id, state}
-  end
-
-  @impl true
-  def handle_call(
-        {:update_host, new_host, new_port},
-        _from,
-        %{udp_config: %{port: old_port}} = state
-      ) do
-    port =
-      if is_nil(new_port),
-        do: old_port,
-        else: new_port
-
-    {:reply, :ok, update_statsd_host(state, new_host, port)}
   end
 
   @impl true

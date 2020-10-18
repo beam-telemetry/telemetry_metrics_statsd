@@ -350,39 +350,6 @@ defmodule TelemetryMetricsStatsdTest do
     end
   end
 
-  test "StatsD host can be reconfigured on the fly" do
-    {socket, port} = given_udp_port_opened()
-    counter = given_counter("http.request.count")
-
-    reporter =
-      start_reporter(
-        host: "localhost",
-        port: port,
-        metrics: [counter],
-        name: :my_statsd
-      )
-
-    pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
-
-    udp = TelemetryMetricsStatsd.get_udp(pool_id)
-    assert udp.port == port
-    assert udp.host == 'localhost'
-
-    :telemetry.execute([:http, :request], %{latency: 213})
-
-    assert_reported(socket, "http.request.count:1|c")
-
-    {new_socket, new_port} = given_udp_port_opened()
-
-    TelemetryMetricsStatsd.update_host(reporter, {127, 0, 0, 1}, new_port)
-
-    new_udp = TelemetryMetricsStatsd.get_udp(pool_id)
-    assert new_udp.port == new_port
-    assert new_udp.host == {127, 0, 0, 1}
-    :telemetry.execute([:http, :request], %{latency: 213})
-    assert_reported(new_socket, "http.request.count:1|c")
-  end
-
   test "published metrics are prefixed with the provided prefix" do
     {socket, port} = given_udp_port_opened()
 
@@ -637,37 +604,6 @@ defmodule TelemetryMetricsStatsdTest do
       udp = TelemetryMetricsStatsd.get_udp(pool_id)
       assert udp.port == port
       assert udp.host == {127, 0, 0, 1}
-
-      :telemetry.execute([:http, :request], %{latency: 213})
-
-      assert_reported(socket, "http.request.count:1|c")
-    end
-
-    test "is performed on host update" do
-      {socket, port} = given_udp_port_opened()
-
-      counter = given_counter("http.request.count")
-
-      reporter =
-        start_reporter(
-          host: "github.com",
-          port: port,
-          metrics: [counter],
-          name: :my_statsd,
-          dns_polling_period: 100
-        )
-
-      pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
-
-      udp = TelemetryMetricsStatsd.get_udp(pool_id)
-      assert udp.port == port
-      assert {_, _, _, _} = udp.host
-
-      TelemetryMetricsStatsd.update_host(reporter, "localhost", port)
-
-      new_udp = TelemetryMetricsStatsd.get_udp(pool_id)
-      assert new_udp.port == port
-      assert new_udp.host == {127, 0, 0, 1}
 
       :telemetry.execute([:http, :request], %{latency: 213})
 
