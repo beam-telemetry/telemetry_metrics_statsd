@@ -4,6 +4,7 @@ defmodule TelemetryMetricsStatsdTest do
   import ExUnit.CaptureLog
   import TelemetryMetricsStatsd.Test.Helpers
   import Liveness
+  import Mock
 
   test "counter metric is reported as StatsD counter with 1 as a value" do
     {socket, port} = given_udp_port_opened()
@@ -591,7 +592,7 @@ defmodule TelemetryMetricsStatsdTest do
           port: port,
           metrics: [counter],
           name: :my_statsd,
-          dns_polling_period: 50
+          dns_polling_period: 5000
         )
 
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
@@ -600,11 +601,73 @@ defmodule TelemetryMetricsStatsdTest do
       assert udp.port == port
       assert udp.host == {127, 0, 0, 1}
 
-      Process.sleep(60)
+      :telemetry.execute([:http, :request], %{latency: 213})
+
+      assert_reported(socket, "http.request.count:1|c")
+    end
+
+    test "is periodically repeated" do
+      {socket, port} = given_udp_port_opened()
+      counter = given_counter("http.request.count")
+
+      reporter =
+        start_reporter(
+          host: "localhost",
+          port: port,
+          metrics: [counter],
+          name: :my_statsd,
+          dns_polling_period: 100
+        )
+
+      pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
+      udp = TelemetryMetricsStatsd.get_udp(pool_id)
+      assert udp.port == port
+      assert udp.host == {127, 0, 0, 1}
+
+      with_mock :inet, [:passthrough, :unstick], getaddr: fn _, _ -> {:ok, {10, 0, 0, 0}} end do
+        Process.sleep(100)
+
+        udp = TelemetryMetricsStatsd.get_udp(pool_id)
+        assert udp.port == port
+        assert udp.host == {10, 0, 0, 0}
+      end
+
+      Process.sleep(100)
 
       udp = TelemetryMetricsStatsd.get_udp(pool_id)
       assert udp.port == port
       assert udp.host == {127, 0, 0, 1}
+
+      :telemetry.execute([:http, :request], %{latency: 213})
+
+      assert_reported(socket, "http.request.count:1|c")
+    end
+
+    test "is performed on host update" do
+      {socket, port} = given_udp_port_opened()
+
+      counter = given_counter("http.request.count")
+
+      reporter =
+        start_reporter(
+          host: "github.com",
+          port: port,
+          metrics: [counter],
+          name: :my_statsd,
+          dns_polling_period: 100
+        )
+
+      pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
+
+      udp = TelemetryMetricsStatsd.get_udp(pool_id)
+      assert udp.port == port
+      assert {_, _, _, _} = udp.host
+
+      TelemetryMetricsStatsd.update_host(reporter, "localhost", port)
+
+      new_udp = TelemetryMetricsStatsd.get_udp(pool_id)
+      assert new_udp.port == port
+      assert new_udp.host == {127, 0, 0, 1}
 
       :telemetry.execute([:http, :request], %{latency: 213})
 

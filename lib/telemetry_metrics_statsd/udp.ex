@@ -48,7 +48,6 @@ defmodule TelemetryMetricsStatsd.UDP do
     end
   end
 
-
   @spec update(t(), :inet.hostname() | :inet.ip_address(), :inet.port_number()) :: t()
   def update(%__MODULE__{} = udp, new_host, new_port) do
     %__MODULE__{udp | host: new_host, port: new_port}

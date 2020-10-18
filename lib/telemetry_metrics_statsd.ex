@@ -578,17 +578,25 @@ defmodule TelemetryMetricsStatsd do
   end
 
   defp update_statsd_host(
-         %{pool_id: pool_id, dns_config: dns_config} = state,
+         %{pool_id: pool_id, dns_config: %{polling_period: period} = dns_config} = state,
          new_host_string,
          new_port
        ) do
     new_host = to_charlist(new_host_string)
 
-    update_pool(pool_id, new_host, new_port)
+    new_host_or_ip =
+      if is_nil(period) do
+        new_host
+      else
+        {:ok, ip} = :inet.getaddr(new_host, :inet)
+        ip
+      end
+
+    update_pool(pool_id, new_host_or_ip, new_port)
 
     %{
       state
-      | udp_config: %{host: new_host, port: new_port},
+      | udp_config: %{host: new_host_or_ip, port: new_port},
         dns_config: %{dns_config | original_host: new_host}
     }
   end
