@@ -4,7 +4,6 @@ defmodule TelemetryMetricsStatsdTest do
   import ExUnit.CaptureLog
   import TelemetryMetricsStatsd.Test.Helpers
   import Liveness
-  import Mock
 
   test "counter metric is reported as StatsD counter with 1 as a value" do
     {socket, port} = given_udp_port_opened()
@@ -548,66 +547,50 @@ defmodule TelemetryMetricsStatsdTest do
     assert_reported(socket, "http.requests:1|c")
   end
 
-  describe "periodic hostname resolution" do
-    test "is performed when configured" do
-      {socket, port} = given_udp_port_opened()
+  describe "hostname resolution" do
+    test "is performed when the reporter starts" do
       counter = given_counter("http.request.count")
+
+      configure_hosts(%{"telemetry-test" => [{10, 0, 0, 1}]})
 
       reporter =
         start_reporter(
-          host: "localhost",
-          port: port,
+          host: "telemetry-test",
           metrics: [counter],
-          name: :my_statsd,
           host_resolution_interval: 5000
         )
 
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
 
-      udp = TelemetryMetricsStatsd.get_udp(pool_id)
-      assert udp.port == port
-      assert udp.host == {127, 0, 0, 1}
-
-      :telemetry.execute([:http, :request], %{latency: 213})
-
-      assert_reported(socket, "http.request.count:1|c")
+      assert eventually(fn ->
+        udp = TelemetryMetricsStatsd.get_udp(pool_id)
+        udp.host == {10, 0, 0, 1}
+      end)
     end
 
     test "is periodically repeated" do
-      {socket, port} = given_udp_port_opened()
       counter = given_counter("http.request.count")
+
+      configure_hosts(%{"telemetry-test" => [{10, 0, 0, 1}]})
 
       reporter =
         start_reporter(
-          host: "localhost",
-          port: port,
+          host: "telemetry-test",
           metrics: [counter],
-          name: :my_statsd,
           host_resolution_interval: 100
         )
 
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
+
       udp = TelemetryMetricsStatsd.get_udp(pool_id)
-      assert udp.port == port
-      assert udp.host == {127, 0, 0, 1}
+      assert udp.host == {10, 0, 0, 1}
 
-      with_mock :inet, [:passthrough, :unstick], getaddr: fn _, _ -> {:ok, {10, 0, 0, 0}} end do
-        Process.sleep(100)
+      configure_hosts(%{"telemetry-test" => [{10, 0, 0, 2}]})
 
+      assert eventually(fn ->
         udp = TelemetryMetricsStatsd.get_udp(pool_id)
-        assert udp.port == port
-        assert udp.host == {10, 0, 0, 0}
-      end
-
-      Process.sleep(100)
-
-      udp = TelemetryMetricsStatsd.get_udp(pool_id)
-      assert udp.port == port
-      assert udp.host == {127, 0, 0, 1}
-
-      :telemetry.execute([:http, :request], %{latency: 213})
-
-      assert_reported(socket, "http.request.count:1|c")
+        udp.host == {10, 0, 0, 2}
+      end)
     end
   end
 

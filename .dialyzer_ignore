@@ -1,3 +1,0 @@
-# TODO: remove when dropping support for Elixir 1.5
-test/support/wait_until.ex:49
-Unknown type hamcrest:matchspec/0

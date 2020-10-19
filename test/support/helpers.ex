@@ -20,4 +20,24 @@ defmodule TelemetryMetricsStatsd.Test.Helpers do
   def given_distribution(event_name, opts \\ []) do
     Telemetry.Metrics.distribution(event_name, opts)
   end
+
+  # Adds static host entries to the test/hosts file.
+  # The file is configured in test/inetrc, which in turn is generated
+  # in a Makefile as a part of a `test` target.
+  @spec configure_hosts(%{String.t() => [:inet.ip_address()]}) :: :ok
+  def configure_hosts(hosts) do
+    content =
+      hosts
+      |> Enum.flat_map(fn {hostname, addresses} ->
+        Enum.map(addresses, &{hostname, &1})
+      end)
+      |> Enum.map(fn {hostname, address} ->
+        "#{:inet.ntoa(address)} #{hostname}"
+      end)
+      |> Enum.join("\n")
+
+    hosts_file = Path.expand("../hosts", __DIR__)
+
+    File.write!(hosts_file, content)
+  end
 end
