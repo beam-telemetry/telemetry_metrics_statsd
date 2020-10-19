@@ -548,7 +548,7 @@ defmodule TelemetryMetricsStatsdTest do
     assert_reported(socket, "http.requests:1|c")
   end
 
-  describe "DNS resolution" do
+  describe "periodic hostname resolution" do
     test "is performed when configured" do
       {socket, port} = given_udp_port_opened()
       counter = given_counter("http.request.count")
@@ -559,7 +559,7 @@ defmodule TelemetryMetricsStatsdTest do
           port: port,
           metrics: [counter],
           name: :my_statsd,
-          dns_polling_period: 5000
+          host_resolution_interval: 5000
         )
 
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
@@ -583,7 +583,7 @@ defmodule TelemetryMetricsStatsdTest do
           port: port,
           metrics: [counter],
           name: :my_statsd,
-          dns_polling_period: 100
+          host_resolution_interval: 100
         )
 
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
