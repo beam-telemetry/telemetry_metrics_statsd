@@ -44,7 +44,7 @@ orbs:
                 - deps-<<parameters.elixir>>-<<parameters.otp>>-{{ checksum "mix.lock" }}
                 - deps-<<parameters.elixir>>-<<parameters.otp>>
           - run: mix deps.get
-          - run: mix test
+          - run: make test
           - when:
               condition: << parameters.check_format >>
               steps:
