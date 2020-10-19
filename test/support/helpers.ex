@@ -45,12 +45,17 @@ defmodule TelemetryMetricsStatsd.Test.Helpers do
     |> Map.keys()
     |> Enum.each(fn hostname ->
       hostname = to_charlist(hostname)
-      Liveness.eventually(fn ->
-        case :inet.gethostbyname(hostname) do
-          {:ok, _} -> true
-          {:error, _} -> false
-        end
-      end)
+
+      Liveness.eventually(
+        fn ->
+          case :inet.gethostbyname(hostname) do
+            {:ok, _} -> true
+            {:error, _} -> false
+          end
+        end,
+        250,
+        500
+      )
     end)
   end
 end

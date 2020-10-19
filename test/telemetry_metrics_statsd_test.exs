@@ -562,10 +562,14 @@ defmodule TelemetryMetricsStatsdTest do
 
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
 
-      assert eventually(fn ->
-        udp = TelemetryMetricsStatsd.get_udp(pool_id)
-        udp.host == {10, 0, 0, 1}
-      end)
+      assert eventually(
+               fn ->
+                 udp = TelemetryMetricsStatsd.get_udp(pool_id)
+                 udp.host == {10, 0, 0, 1}
+               end,
+               250,
+               500
+             )
     end
 
     test "is periodically repeated" do
@@ -587,10 +591,14 @@ defmodule TelemetryMetricsStatsdTest do
 
       configure_hosts(%{"telemetry-test" => [{10, 0, 0, 2}]})
 
-      assert eventually(fn ->
-        udp = TelemetryMetricsStatsd.get_udp(pool_id)
-        udp.host == {10, 0, 0, 2}
-      end)
+      assert eventually(
+               fn ->
+                 udp = TelemetryMetricsStatsd.get_udp(pool_id)
+                 udp.host == {10, 0, 0, 2}
+               end,
+               250,
+               500
+             )
     end
   end
 
