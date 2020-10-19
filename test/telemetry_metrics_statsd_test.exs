@@ -548,66 +548,51 @@ defmodule TelemetryMetricsStatsdTest do
     assert_reported(socket, "http.requests:1|c")
   end
 
-  describe "DNS resolution" do
+  describe "periodic hostname resolution" do
     test "is performed when configured" do
-      {socket, port} = given_udp_port_opened()
       counter = given_counter("http.request.count")
 
       reporter =
         start_reporter(
           host: "localhost",
-          port: port,
           metrics: [counter],
           name: :my_statsd,
-          dns_polling_period: 5000
+          host_resolution_interval: 5000
         )
 
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
 
       udp = TelemetryMetricsStatsd.get_udp(pool_id)
-      assert udp.port == port
       assert udp.host == {127, 0, 0, 1}
-
-      :telemetry.execute([:http, :request], %{latency: 213})
-
-      assert_reported(socket, "http.request.count:1|c")
     end
 
     test "is periodically repeated" do
-      {socket, port} = given_udp_port_opened()
       counter = given_counter("http.request.count")
 
       reporter =
         start_reporter(
           host: "localhost",
-          port: port,
           metrics: [counter],
           name: :my_statsd,
-          dns_polling_period: 100
+          host_resolution_interval: 100
         )
 
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
       udp = TelemetryMetricsStatsd.get_udp(pool_id)
-      assert udp.port == port
       assert udp.host == {127, 0, 0, 1}
 
-      with_mock :inet, [:passthrough, :unstick], getaddr: fn _, _ -> {:ok, {10, 0, 0, 0}} end do
-        Process.sleep(100)
-
-        udp = TelemetryMetricsStatsd.get_udp(pool_id)
-        assert udp.port == port
-        assert udp.host == {10, 0, 0, 0}
+      with_mock :inet, [:passthrough, :unstick],
+        gethostbyname: fn _ -> {:ok, {:hostent, 'localhost', [], :inet, 4, [{10, 0, 0, 0}]}} end do
+        eventually(fn ->
+          udp = TelemetryMetricsStatsd.get_udp(pool_id)
+          assert udp.host == {10, 0, 0, 0}
+        end)
       end
 
-      Process.sleep(100)
-
-      udp = TelemetryMetricsStatsd.get_udp(pool_id)
-      assert udp.port == port
-      assert udp.host == {127, 0, 0, 1}
-
-      :telemetry.execute([:http, :request], %{latency: 213})
-
-      assert_reported(socket, "http.request.count:1|c")
+      eventually(fn ->
+        udp = TelemetryMetricsStatsd.get_udp(pool_id)
+        assert udp.host == {127, 0, 0, 1}
+      end)
     end
   end
 
