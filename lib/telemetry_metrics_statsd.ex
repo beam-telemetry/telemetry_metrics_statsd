@@ -520,8 +520,7 @@ defmodule TelemetryMetricsStatsd do
 
     new_state =
       case :inet.gethostbyname(host) do
-        {:ok, hostent(h_addr_list: ips) = hostent} ->
-          IO.inspect(hostent, label: "resolved")
+        {:ok, hostent(h_addr_list: ips)} ->
           if Enum.member?(ips, current_address) do
             state
           else
