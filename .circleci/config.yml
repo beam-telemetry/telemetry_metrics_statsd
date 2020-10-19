@@ -32,6 +32,7 @@ orbs:
           elixir: <<parameters.elixir>>
           otp: <<parameters.otp>>
         steps:
+          - run: apk add make
           - run: mix local.hex --force
           - run: mix local.rebar --force
           - checkout
