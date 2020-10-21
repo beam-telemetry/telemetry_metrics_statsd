@@ -43,11 +43,14 @@ defmodule TelemetryMetricsStatsd.Test.Helpers do
       end)
       |> Enum.join("\n")
 
+    # :inet consideres the file as changed when its #file_info record
+    # changes: https://erlang.org/doc/man/file.html#type-file_info.
+    # Wait 2 seconds to make sure that the #file_info is different
+    # due to a different creation time, even when the file's size doesn't change.
+    Process.sleep(2)
     File.write!(hosts_file, content)
 
     # Wait until all hostnames resolve to configured addresses.
-    # It looks like :inet checks the hosts file for changes every 5 seconds:
-    # https://github.com/erlang/otp/blob/OTP-23.0/lib/kernel/src/inet_res.hrl#L26.
     Enum.each(hosts, fn {hostname, addresses} ->
       hostname = to_charlist(hostname)
 
