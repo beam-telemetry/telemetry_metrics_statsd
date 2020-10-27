@@ -57,7 +57,7 @@ defmodule TelemetryMetricsStatsd.Test.Helpers do
     IO.puts("BEFORE == AFTER = #{before == after_}")
     IO.puts(File.read!(hosts_file))
 
-    # Wait until all hostnames resolve to configured addresses.
+    Wait until all hostnames resolve to configured addresses.
     Enum.each(hosts, fn {hostname, addresses} ->
       hostname = to_charlist(hostname)
 
