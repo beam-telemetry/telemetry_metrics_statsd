@@ -307,7 +307,6 @@ defmodule TelemetryMetricsStatsd do
   use GenServer
 
   require Logger
-  require Record
 
   alias Telemetry.Metrics
   alias TelemetryMetricsStatsd.{EventHandler, UDP}
@@ -323,14 +322,12 @@ defmodule TelemetryMetricsStatsd do
           | {:formatter, :standard | :datadog}
           | {:global_tags, Keyword.t()}
           | {:name, atom()}
-          | {:host_resolution_interval, non_neg_integer()}
+          | {:dns_polling_period, non_neg_integer()}
   @type options :: [option]
 
   @default_port 8125
   @default_mtu 512
   @default_formatter :standard
-
-  Record.defrecordp(:hostent, Record.extract(:hostent, from_lib: "kernel/include/inet.hrl"))
 
   @doc """
   Reporter's child spec.
@@ -368,13 +365,10 @@ defmodule TelemetryMetricsStatsd do
     when the metrics are published. Defaults to `512`.
   * `:global_tags` - Additional default tag values to be sent along with every published metric. These
     can be overriden by tags sent via the `:telemetry.execute` call.
-  * `:pool_size` - The number of UDP sockets to open to report metrics. Defaults to `1`.
-  * `:host_resolution_interval` - When set, makes the reporter resolve the hostname of the StatsD server
-    on a specified interval instead of looking up the hostname on every packet send using the system DNS
-    stack. This can improve the performance of publishing metrics while still allowing for dynamic
-    hostname resolution. Only applies when `:host` is a string and no an IP address. If the provided hostname
-    resolves to multiple IP addresses, the first one is used.
-
+  * `:pool_size` - The number of UDP ports to open to report metrics. Defaults to `1`
+  * `:dns_polling_period` - When set makes `TelemetryMetricsStatsd` resolve the hostname of the StatsD server
+    on the specified interval in milliseconds. Defaults to `nil` disabling DNS resolution. This can improve
+    performance of UDP sending, while still allowing for dynamic resolution e.g. in a Kubernetes environment.
 
   You can read more about all the options in the `TelemetryMetricsStatsd` module documentation.
 
@@ -393,8 +387,6 @@ defmodule TelemetryMetricsStatsd do
   """
   @spec start_link(options) :: GenServer.on_start()
   def start_link(options) do
-    gen_server_opts = Keyword.take(options, [:name])
-
     config =
       options
       |> Enum.into(%{})
@@ -410,6 +402,12 @@ defmodule TelemetryMetricsStatsd do
       |> Map.update!(:formatter, &validate_and_translate_formatter/1)
       |> Map.put_new(:global_tags, Keyword.new())
       |> Map.put_new(:pool_size, 1)
+
+    gen_server_opts =
+      case Map.get(config, :name) do
+        nil -> []
+        name -> [name: name]
+      end
 
     GenServer.start_link(__MODULE__, config, gen_server_opts)
   end
@@ -443,7 +441,7 @@ defmodule TelemetryMetricsStatsd do
 
     udp_config =
       case config.socket_path do
-        nil -> configure_host_resolution(config)
+        nil -> setup_dns_resolution(config)
         socket_path -> %{socket_path: socket_path}
       end
 
@@ -453,7 +451,12 @@ defmodule TelemetryMetricsStatsd do
         {:udp, udp}
       end
 
-    pool_name = Map.get(config, :name, __MODULE__)
+    pool_name =
+      case Map.get(config, :name) do
+        nil -> __MODULE__
+        name -> name
+      end
+
     pool_id = :ets.new(pool_name, [:bag, :protected, read_concurrency: true])
     :ets.insert(pool_id, udps)
 
@@ -473,9 +476,10 @@ defmodule TelemetryMetricsStatsd do
        udp_config: udp_config,
        handler_ids: handler_ids,
        pool_id: pool_id,
-       host: config[:host],
-       port: config[:port],
-       host_resolution_interval: config[:host_resolution_interval]
+       dns_config: %{
+         original_host: config[:host],
+         polling_period: config[:dns_polling_period]
+       }
      }}
   end
 
@@ -514,29 +518,28 @@ defmodule TelemetryMetricsStatsd do
   end
 
   @impl true
-  def handle_info(:resolve_host, state) do
-    %{host: host, udp_config: %{host: current_address}, host_resolution_interval: interval} =
-      state
+  def handle_info(:dns_poll, %{dns_config: %{original_host: {_, _, _, _}}} = state) do
+    {:noreply, state}
+  end
 
+  @impl true
+  def handle_info(
+        :dns_poll,
+        %{
+          udp_config: %{host: current_host, port: port},
+          dns_config: %{original_host: host, polling_period: period}
+        } = state
+      ) do
     new_state =
-      case :inet.gethostbyname(host) do
-        {:ok, hostent(h_addr_list: ips)} ->
-          if Enum.member?(ips, current_address) do
-            state
-          else
-            [new_address | _] = ips
-            update_host(state, new_address)
-          end
+      case :inet.getaddr(host, :inet) do
+        {:ok, ^current_host} ->
+          state
 
-        {:error, reason} ->
-          Logger.warn(
-            "Failed to resolve the hostname #{host}: #{inspect(reason)}. " <>
-              "Using the previously resolved address of #{:inet.ntoa(current_address)}."
-          )
+        {:ok, new_host} ->
+          update_statsd_host(state, new_host, port)
       end
 
-    Process.send_after(self(), :resolve_host, interval)
-
+    Process.send_after(self(), :dns_poll, period)
     {:noreply, new_state}
   end
 
@@ -547,11 +550,38 @@ defmodule TelemetryMetricsStatsd do
     :ok
   end
 
-  defp update_host(state, new_address) do
-    %{pool_id: pool_id, udp_config: %{port: port} = udp_config} = state
-    update_pool(pool_id, new_address, port)
+  defp update_statsd_host(
+         %{pool_id: pool_id} = state,
+         {_, _, _, _} = new_host,
+         new_port
+       ) do
+    update_pool(pool_id, new_host, new_port)
 
-    %{state | udp_config: %{udp_config | host: new_address}}
+    %{state | udp_config: %{host: new_host, port: new_port}}
+  end
+
+  defp update_statsd_host(
+         %{pool_id: pool_id, dns_config: %{polling_period: period} = dns_config} = state,
+         new_host_string,
+         new_port
+       ) do
+    new_host = to_charlist(new_host_string)
+
+    new_host_or_ip =
+      if is_nil(period) do
+        new_host
+      else
+        {:ok, ip} = :inet.getaddr(new_host, :inet)
+        ip
+      end
+
+    update_pool(pool_id, new_host_or_ip, new_port)
+
+    %{
+      state
+      | udp_config: %{host: new_host_or_ip, port: new_port},
+        dns_config: %{dns_config | original_host: new_host}
+    }
   end
 
   defp validate_and_translate_formatter(:standard), do: TelemetryMetricsStatsd.Formatter.Standard
@@ -560,17 +590,17 @@ defmodule TelemetryMetricsStatsd do
   defp validate_and_translate_formatter(_),
     do: raise(ArgumentError, ":formatter needs to be either :standard or :datadog")
 
-  defp configure_host_resolution(%{host: host, port: port}) when is_tuple(host) do
+  defp setup_dns_resolution(%{host: {_, _, _, _} = host, port: port}) do
     %{host: host, port: port}
   end
 
-  defp configure_host_resolution(%{host: host, port: port, host_resolution_interval: interval}) do
-    {:ok, hostent(h_addr_list: [ip | _ips])} = :inet.gethostbyname(host)
-    Process.send_after(self(), :resolve_host, interval)
+  defp setup_dns_resolution(%{dns_polling_period: period, host: host, port: port}) do
+    {:ok, ip} = :inet.getaddr(host, :inet)
+    Process.send_after(self(), :dns_poll, period)
     %{host: ip, port: port}
   end
 
-  defp configure_host_resolution(%{host: host, port: port}) do
+  defp setup_dns_resolution(%{host: host, port: port}) do
     %{host: host, port: port}
   end
 
