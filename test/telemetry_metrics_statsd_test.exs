@@ -587,6 +587,9 @@ defmodule TelemetryMetricsStatsdTest do
 
       configure_hosts(%{"telemetry-test" => [{10, 0, 0, 2}]})
 
+      IO.puts(File.read!("test/hosts"))
+      IO.inspect(:inet.get_rc())
+
       assert eventually(fn ->
         udp = TelemetryMetricsStatsd.get_udp(pool_id)
         udp.host == {10, 0, 0, 2}
