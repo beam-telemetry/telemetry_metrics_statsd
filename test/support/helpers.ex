@@ -31,7 +31,7 @@ defmodule TelemetryMetricsStatsd.Test.Helpers do
   @spec configure_hosts(%{String.t() => [:inet.ip_address()]}) :: :ok
   def configure_hosts(hosts) do
     hosts_file = Path.expand("../hosts", __DIR__)
-    File.rm_rf!(hosts_file)
+    File.rm!(hosts_file)
 
     content =
       hosts
