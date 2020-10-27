@@ -30,9 +30,6 @@ defmodule TelemetryMetricsStatsd.Test.Helpers do
   # in a Makefile as a part of a `test` target.
   @spec configure_hosts(%{String.t() => [:inet.ip_address()]}) :: :ok
   def configure_hosts(hosts) do
-    hosts_file = Path.expand("../hosts", __DIR__)
-    File.rm!(hosts_file)
-
     content =
       hosts
       |> Enum.flat_map(fn {hostname, addresses} ->
@@ -43,11 +40,11 @@ defmodule TelemetryMetricsStatsd.Test.Helpers do
       end)
       |> Enum.join("\n")
 
+    hosts_file = Path.expand("../hosts", __DIR__)
+
     File.write!(hosts_file, content)
 
     # Wait until all hostnames resolve to configured addresses.
-    # It looks like :inet checks the hosts file for changes every 5 seconds:
-    # https://github.com/erlang/otp/blob/OTP-23.0/lib/kernel/src/inet_res.hrl#L26.
     Enum.each(hosts, fn {hostname, addresses} ->
       hostname = to_charlist(hostname)
 
