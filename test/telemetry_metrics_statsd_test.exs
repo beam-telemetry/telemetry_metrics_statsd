@@ -4,6 +4,7 @@ defmodule TelemetryMetricsStatsdTest do
   import ExUnit.CaptureLog
   import TelemetryMetricsStatsd.Test.Helpers
   import Liveness
+  import Mock
 
   test "counter metric is reported as StatsD counter with 1 as a value" do
     {socket, port} = given_udp_port_opened()
@@ -545,6 +546,54 @@ defmodule TelemetryMetricsStatsdTest do
 
     assert_reported(socket, "http.requests:1|c")
     assert_reported(socket, "http.requests:1|c")
+  end
+
+  describe "periodic hostname resolution" do
+    test "is performed when configured" do
+      counter = given_counter("http.request.count")
+
+      reporter =
+        start_reporter(
+          host: "localhost",
+          metrics: [counter],
+          name: :my_statsd,
+          host_resolution_interval: 5000
+        )
+
+      pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
+
+      udp = TelemetryMetricsStatsd.get_udp(pool_id)
+      assert udp.host == {127, 0, 0, 1}
+    end
+
+    test "is periodically repeated" do
+      counter = given_counter("http.request.count")
+
+      reporter =
+        start_reporter(
+          host: "localhost",
+          metrics: [counter],
+          name: :my_statsd,
+          host_resolution_interval: 100
+        )
+
+      pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
+      udp = TelemetryMetricsStatsd.get_udp(pool_id)
+      assert udp.host == {127, 0, 0, 1}
+
+      with_mock :inet, [:passthrough, :unstick],
+        gethostbyname: fn _ -> {:ok, {:hostent, 'localhost', [], :inet, 4, [{10, 0, 0, 0}]}} end do
+        eventually(fn ->
+          udp = TelemetryMetricsStatsd.get_udp(pool_id)
+          assert udp.host == {10, 0, 0, 0}
+        end)
+      end
+
+      eventually(fn ->
+        udp = TelemetryMetricsStatsd.get_udp(pool_id)
+        assert udp.host == {127, 0, 0, 1}
+      end)
+    end
   end
 
   defp given_udp_port_opened() do
