@@ -322,7 +322,6 @@ defmodule TelemetryMetricsStatsd do
           | {:prefix, prefix()}
           | {:formatter, :standard | :datadog}
           | {:global_tags, Keyword.t()}
-          | {:name, atom()}
           | {:host_resolution_interval, non_neg_integer()}
   @type options :: [option]
 
@@ -393,8 +392,6 @@ defmodule TelemetryMetricsStatsd do
   """
   @spec start_link(options) :: GenServer.on_start()
   def start_link(options) do
-    gen_server_opts = Keyword.take(options, [:name])
-
     config =
       options
       |> Enum.into(%{})
@@ -411,7 +408,7 @@ defmodule TelemetryMetricsStatsd do
       |> Map.put_new(:global_tags, Keyword.new())
       |> Map.put_new(:pool_size, 1)
 
-    GenServer.start_link(__MODULE__, config, gen_server_opts)
+    GenServer.start_link(__MODULE__, config)
   end
 
   @doc false
@@ -453,8 +450,7 @@ defmodule TelemetryMetricsStatsd do
         {:udp, udp}
       end
 
-    pool_name = Map.get(config, :name, __MODULE__)
-    pool_id = :ets.new(pool_name, [:bag, :protected, read_concurrency: true])
+    pool_id = :ets.new(__MODULE__, [:bag, :protected, read_concurrency: true])
     :ets.insert(pool_id, udps)
 
     handler_ids =
