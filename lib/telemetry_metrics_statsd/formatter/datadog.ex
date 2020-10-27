@@ -9,19 +9,13 @@ defmodule TelemetryMetricsStatsd.Formatter.Datadog do
 
   @impl true
   def format(metric, value, tags) do
-    case format_metric_value(metric, value) do
-      [] ->
-        []
-
-      val ->
-        [
-          format_metric_name(metric.name),
-          ?:,
-          val,
-          format_sampling_rate(metric.reporter_options),
-          format_metric_tags(tags)
-        ]
-    end
+    [
+      format_metric_name(metric.name),
+      ?:,
+      format_metric_value(metric, value),
+      format_sampling_rate(metric.reporter_options),
+      format_metric_tags(tags)
+    ]
   end
 
   defp format_metric_name([segment]) do
