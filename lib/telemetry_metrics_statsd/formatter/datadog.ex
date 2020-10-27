@@ -9,19 +9,13 @@ defmodule TelemetryMetricsStatsd.Formatter.Datadog do
 
   @impl true
   def format(metric, value, tags) do
-    case format_metric_value(metric, value) do
-      [] ->
-        []
-
-      val ->
-        [
-          format_metric_name(metric.name),
-          ?:,
-          val,
-          format_sampling_rate(metric.reporter_options),
-          format_metric_tags(tags)
-        ]
-    end
+    [
+      format_metric_name(metric.name),
+      ?:,
+      format_metric_value(metric, value),
+      format_sampling_rate(metric.reporter_options),
+      format_metric_tags(tags)
+    ]
   end
 
   defp format_metric_name([segment]) do
@@ -42,29 +36,7 @@ defmodule TelemetryMetricsStatsd.Formatter.Datadog do
   defp format_metric_value(%Metrics.LastValue{}, value),
     do: [format_number(value), "|g"]
 
-  defp format_metric_value(%Metrics.Sum{reporter_options: reporter_options} = sum, value) do
-    case Keyword.get(reporter_options, :report_as) do
-      :counter -> format_counter_metric_value(sum, value)
-      _ -> format_sum_metric_value(sum, value)
-    end
-  end
-
-  defp format_counter_metric_value(%Metrics.Sum{}, value) when value >= 0,
-    do: [format_number(value), "|c"]
-
-  defp format_counter_metric_value(%Metrics.Sum{}, value) do
-    Logger.warn(
-      "Unable to format negative value: #{inspect(value)} for reporting to Datadog Counter"
-    )
-
-    []
-  end
-
-  defp format_sum_metric_value(%Metrics.Sum{}, value) when value >= 0,
-    do: [?+, format_number(value), "|g"]
-
-  defp format_sum_metric_value(%Metrics.Sum{}, value),
-    do: [format_number(value), "|g"]
+  defp format_metric_value(%Metrics.Sum{}, value), do: [format_number(value), "|c"]
 
   defp format_number(number) when is_integer(number) do
     :erlang.integer_to_binary(number)

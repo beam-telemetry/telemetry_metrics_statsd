@@ -232,8 +232,15 @@ defmodule TelemetryMetricsStatsd do
 
   #### Metric types
 
-  There is no difference in how the counter, last value, and sum metrics are handled between
+  There is no difference in how the counter and last value metrics are handled between
   the standard and DataDog formatters.
+
+  The sum metric is reporter as DataDog counter, which is being transformed into a rate metric
+  in DataDog: https://docs.datadoghq.com/developers/metrics/dogstatsd_metrics_submission/#count.
+  To be able to observe the actual sum of measurements make sure to use the
+  [`as_count()`](https://docs.datadoghq.com/developers/metrics/type_modifiers/?tab=rate#in-application-modifiers)
+  modifier in your DataDog dashboard. The `report_as: :count` option does not have any effect
+  with the DataDog formatter.
 
   The summary metric is reported as [DataDog
   histogram](https://docs.datadoghq.com/developers/metrics/types/?tab=histogram), as that is the
