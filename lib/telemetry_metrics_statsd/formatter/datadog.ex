@@ -42,25 +42,7 @@ defmodule TelemetryMetricsStatsd.Formatter.Datadog do
   defp format_metric_value(%Metrics.LastValue{}, value),
     do: [format_number(value), "|g"]
 
-  defp format_metric_value(%Metrics.Sum{} = sum, value) do
-    format_counter_metric_value(sum, value)
-  end
-
-  defp format_counter_metric_value(%Metrics.Sum{}, value), do: [format_number(value), "|c"]
-
-  defp format_counter_metric_value(%Metrics.Sum{}, value) do
-    Logger.warn(
-      "Unable to format negative value: #{inspect(value)} for reporting to Datadog Counter"
-    )
-
-    []
-  end
-
-  defp format_sum_metric_value(%Metrics.Sum{}, value) when value >= 0,
-    do: [?+, format_number(value), "|g"]
-
-  defp format_sum_metric_value(%Metrics.Sum{}, value),
-    do: [format_number(value), "|g"]
+  defp format_metric_value(%Metrics.Sum{}, value), do: [format_number(value), "|c"]
 
   defp format_number(number) when is_integer(number) do
     :erlang.integer_to_binary(number)
