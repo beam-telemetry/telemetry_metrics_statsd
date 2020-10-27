@@ -31,8 +31,6 @@ defmodule TelemetryMetricsStatsd.Test.Helpers do
   @spec configure_hosts(%{String.t() => [:inet.ip_address()]}) :: :ok
   def configure_hosts(hosts) do
     hosts_file = Path.expand("../hosts", __DIR__)
-    before = :erl_prim_loader.read_file_info(to_charlist(hosts_file))
-    IO.inspect(before, label: "BEFORE")
     File.rm_rf!(hosts_file)
 
     content =
@@ -49,15 +47,10 @@ defmodule TelemetryMetricsStatsd.Test.Helpers do
     # changes: https://erlang.org/doc/man/file.html#type-file_info.
     # Wait 2 seconds to make sure that the #file_info is different
     # due to a different creation time, even when the file's size doesn't change.
-    Process.sleep(2000)
+    Process.sleep(2)
     File.write!(hosts_file, content)
 
-    after_ = :erl_prim_loader.read_file_info(to_charlist(hosts_file))
-    IO.inspect(after_, label: "AFTER")
-    IO.puts("BEFORE == AFTER = #{before == after_}")
-    IO.puts(File.read!(hosts_file))
-
-    Wait until all hostnames resolve to configured addresses.
+    # Wait until all hostnames resolve to configured addresses.
     Enum.each(hosts, fn {hostname, addresses} ->
       hostname = to_charlist(hostname)
 
@@ -68,8 +61,7 @@ defmodule TelemetryMetricsStatsd.Test.Helpers do
               IO.puts("resolved: #{inspect(resolved_addresses)}, expected: #{inspect(addresses)}")
               Enum.sort(addresses) == Enum.sort(resolved_addresses)
 
-            {:error, _} = err ->
-              IO.inspect(err)
+            {:error, _} ->
               false
           end
         end,
