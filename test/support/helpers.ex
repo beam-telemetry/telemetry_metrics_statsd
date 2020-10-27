@@ -39,18 +39,5 @@ defmodule TelemetryMetricsStatsd.Test.Helpers do
     hosts_file = Path.expand("../hosts", __DIR__)
 
     File.write!(hosts_file, content)
-
-    # Wait until all hostnames are resolvable.
-    hosts
-    |> Map.keys()
-    |> Enum.each(fn hostname ->
-      hostname = to_charlist(hostname)
-      Liveness.eventually(fn ->
-        case :inet.gethostbyname(hostname) do
-          {:ok, _} -> true
-          {:error, _} -> false
-        end
-      end)
-    end)
   end
 end
