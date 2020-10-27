@@ -1,10 +1,6 @@
 defmodule TelemetryMetricsStatsd.Test.Helpers do
   @moduledoc false
 
-  require Record
-
-  Record.defrecordp(:hostent, Record.extract(:hostent, from_lib: "kernel/include/inet.hrl"))
-
   def given_counter(event_name, opts \\ []) do
     Telemetry.Metrics.counter(event_name, opts)
   end
@@ -44,19 +40,17 @@ defmodule TelemetryMetricsStatsd.Test.Helpers do
 
     File.write!(hosts_file, content)
 
-    # Wait until all hostnames resolve to configured addresses.
-    Enum.each(hosts, fn {hostname, addresses} ->
+    # Wait until all hostnames are resolvable.
+    hosts
+    |> Map.keys()
+    |> Enum.each(fn hostname ->
       hostname = to_charlist(hostname)
 
       Liveness.eventually(
         fn ->
           case :inet.gethostbyname(hostname) do
-            {:ok, hostent(h_addr_list: resolved_addresses)} ->
-              IO.puts("resolved: #{inspect(resolved_addresses)}, expected: #{inspect(addresses)}")
-              Enum.sort(addresses) == Enum.sort(resolved_addresses)
-
-            {:error, _} ->
-              false
+            {:ok, _} -> true
+            {:error, _} -> false
           end
         end,
         250,
