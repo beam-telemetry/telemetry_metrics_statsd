@@ -68,6 +68,12 @@ defmodule TelemetryMetricsStatsd.Formatter.StandardTest do
              "my.awesome.metric.nil.200:131|g"
   end
 
+  test "empty string tag values are dropped" do
+    m = given_last_value("my.awesome.metric", tags: [:method, :status])
+
+    assert format(m, 131, method: "", status: 200) == ""
+  end
+
   test "tags passed as explicit argument are used for the formatted metric" do
     m = given_last_value("my.awesome.metric", tags: [:whatever])
 

@@ -142,6 +142,26 @@ defmodule TelemetryMetricsStatsdTest do
     end
   end
 
+  test "it doesn't crash when tag values are missing" do
+    {socket, port} = given_udp_port_opened()
+
+    counter = given_counter("http.request.count", tags: [:method, :status])
+
+    start_reporter(
+      metrics: [counter],
+      port: port,
+      formatter: :datadog
+    )
+
+    handlers_before = :telemetry.list_handlers([])
+
+    :telemetry.execute([:http, :request], %{latency: 172}, %{method: "GET"})
+    assert_reported(socket, "http.request.count:1|c|#method:GET,status:")
+
+    handlers_after = :telemetry.list_handlers([])
+    assert handlers_after == handlers_before
+  end
+
   test "measurement function is taken into account when getting the value for the metric" do
     {socket, port} = given_udp_port_opened()
     last_value = given_last_value("vm.memory.total", measurement: fn m -> m.total * 2 end)
