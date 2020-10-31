@@ -9,18 +9,24 @@ defmodule TelemetryMetricsStatsd.Formatter.Standard do
 
   @impl true
   def format(metric, value, tags) do
-    case format_metric_value(metric, value) do
-      [] ->
+    case format_metric_tags(tags) do
+      nil ->
         []
 
-      val ->
-        [
-          format_metric_name(metric.name),
-          format_metric_tags(tags),
-          ?:,
-          val,
-          format_sampling_rate(metric.reporter_options)
-        ]
+      formatted_tags ->
+        case format_metric_value(metric, value) do
+          nil ->
+            []
+
+          formatted_value ->
+            [
+              format_metric_name(metric.name),
+              formatted_tags,
+              ?:,
+              formatted_value,
+              format_sampling_rate(metric.reporter_options)
+            ]
+        end
     end
   end
 
@@ -32,15 +38,26 @@ defmodule TelemetryMetricsStatsd.Formatter.Standard do
     [:erlang.atom_to_binary(segment, :utf8), ?. | format_metric_name(segments)]
   end
 
-  defp format_metric_tags([]) do
+  defp format_metric_tags(tags) do
+    do_format_metric_tags(tags)
+  catch
+    :throw, :empty ->
+      nil
+  end
+
+  defp do_format_metric_tags([]) do
     []
   end
 
-  defp format_metric_tags([{_, nil} | tags]) do
+  defp do_format_metric_tags([{_, ""} | _tags]) do
+    throw(:empty)
+  end
+
+  defp do_format_metric_tags([{_, nil} | tags]) do
     [?., "nil" | format_metric_tags(tags)]
   end
 
-  defp format_metric_tags([{_, tag_value} | tags]) do
+  defp do_format_metric_tags([{_, tag_value} | tags]) do
     [?., to_string(tag_value) | format_metric_tags(tags)]
   end
 
@@ -70,7 +87,7 @@ defmodule TelemetryMetricsStatsd.Formatter.Standard do
       "Unable to format negative value: #{inspect(value)} for reporting to StatsD Counter"
     )
 
-    []
+    nil
   end
 
   defp format_sum_metric_value(%Metrics.Sum{}, value) when value >= 0,

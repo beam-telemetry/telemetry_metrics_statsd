@@ -55,6 +55,13 @@ defmodule TelemetryMetricsStatsd.Formatter.DatadogTest do
              "my.awesome.metric:131|g|#method:nil,status:200"
   end
 
+  test "empty tag values are included in the formatted metric" do
+    m = given_last_value("my.awesome.metric", tags: [:method, :status])
+
+    assert format(m, 131, method: "", status: 200) ==
+             "my.awesome.metric:131|g|#method:,status:200"
+  end
+
   test "tags passed as explicit argument are used for the formatted metric" do
     m = given_last_value("my.awesome.metric", tags: [:whatever])
 
