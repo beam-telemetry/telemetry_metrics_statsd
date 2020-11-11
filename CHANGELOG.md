@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0](https://github.com/beam-telemetry/telemetry_metrics_statsd/tree/v0.5.0)
+
+This release brings a few new features, performance improvements, but also one backwards-incompatible change.
+
+Again, all credit for the improvements goes to our fantastic contributors!
+
+### Complete list of changes
+
+This version is compatible with Telemetry.Metrics v0.6.0, meaning that you can use 2-arity measurement functions, accepting both event measurements and metadata.
+
+It's also tested for compatibility with Elixir 1.11.
+
+Among various improvements, this release also brings one backwards-incompatible change in DataDog formatter, which fixes the previous, incorrect behaviour.
+Previously, the sum metric updates would be translated to gauge increments/decrements on the DataDog side.
+However, DataDog doesn't support relative changes of gauge's value, and so the reported metric would show only the last measurement sent by the reporter.
+The current version correctly sends sum updates as relative changes to the DataDog counter, which results in correct metric values on the DataDog side.
+
+#### Added
+
+- Send metrics to Unix Domain Sockets via `:socket_path` option. (#37 by @kamilkowalski)
+- Open multiple sockets to send metrics through via `:pool_size` option. (#41 by @epilgrim)
+- Dynamically resolve configured hostname to avoid DNS lookup on every metric update. (#48 by @haljin)
+
+#### Changed
+
+- Allow empty and non-existent tag values in published events. (#49)
+- Send sum metric updates with DataDog formatter as relative counter changes instead of relative gauge changes. (#47)
+
+#### Fixed
+
+- Prevent port leak by explicitly closing the failing socket. (#40 by @kamilkowalski)
+
 ## [0.4.0](https://github.com/beam-telemetry/telemetry_metrics_statsd/tree/v0.4.0)
 
 This release is by far the most feature rich update of the reporter. This wouldn't be possible without the amazing contributions we received! 💛
