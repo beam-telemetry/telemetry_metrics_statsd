@@ -56,7 +56,7 @@ defmodule TelemetryMetricsStatsd.EventHandler do
       }) do
     packets =
       for metric <- metrics do
-        if value = keep?(metric, metadata) && fetch_measurement(metric, measurements) do
+        if value = keep?(metric, metadata) && fetch_measurement(metric, measurements, metadata) do
           # The order of tags needs to be preserved so that the final metric name is built correctly.
           tag_values =
             global_tags
@@ -89,8 +89,12 @@ defmodule TelemetryMetricsStatsd.EventHandler do
   defp keep?(%{keep: nil}, _metadata), do: true
   defp keep?(%{keep: keep}, metadata), do: keep.(metadata)
 
-  @spec fetch_measurement(Metrics.t(), :telemetry.event_measurements()) :: number() | nil
-  defp fetch_measurement(%Metrics.Counter{} = metric, _measurements) do
+  @spec fetch_measurement(
+          Metrics.t(),
+          :telemetry.event_measurements(),
+          :telemetry.event_metadata()
+        ) :: number() | nil
+  defp fetch_measurement(%Metrics.Counter{} = metric, _measurements, _metadata) do
     # For counter, we can ignore the measurements and just use 0.
     case sample(metric) do
       nil -> nil
@@ -98,7 +102,7 @@ defmodule TelemetryMetricsStatsd.EventHandler do
     end
   end
 
-  defp fetch_measurement(metric, measurements) do
+  defp fetch_measurement(metric, measurements, metadata) do
     value =
       case sample(metric) do
         nil ->
@@ -106,6 +110,9 @@ defmodule TelemetryMetricsStatsd.EventHandler do
 
         fun when is_function(fun, 1) ->
           fun.(measurements)
+
+        fun when is_function(fun, 2) ->
+          fun.(measurements, metadata)
 
         key ->
           measurements[key]
