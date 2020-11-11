@@ -177,6 +177,25 @@ defmodule TelemetryMetricsStatsdTest do
     assert_reported(socket, "vm.memory.total:3744|g")
   end
 
+  test "measurement function can take two arguments" do
+    {socket, port} = given_udp_port_opened()
+
+    last_value =
+      given_last_value("my.statistics.mean",
+        measurement: fn measurements, metadata -> measurements.sum / metadata.sample_size end
+      )
+
+    start_reporter(metrics: [last_value], port: port)
+
+    :telemetry.execute([:my, :statistics], %{sum: 200}, %{sample_size: 2})
+    :telemetry.execute([:my, :statistics], %{sum: 300}, %{sample_size: 3})
+    :telemetry.execute([:my, :statistics], %{sum: 100}, %{sample_size: 1})
+
+    assert_reported(socket, "my.statistics.mean:100|g")
+    assert_reported(socket, "my.statistics.mean:100|g")
+    assert_reported(socket, "my.statistics.mean:100|g")
+  end
+
   test "there can be multiple metrics derived from the same event" do
     {socket, port} = given_udp_port_opened()
 
