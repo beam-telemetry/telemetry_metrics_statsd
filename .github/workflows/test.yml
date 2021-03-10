@@ -95,4 +95,4 @@ jobs:
           restore-keys: |
             build-${{ runner.os }}-${{ matrix.otp_version }}-${{ matrix.elixir }}-${{ hashFiles('mix.lock')) }}
             build-${{ runner.os }}-${{ matrix.otp_version }}-${{ matrix.elixir }}-
-      - run: mix dialyzer
+      - run: mix dialyzer --halt-exit-status
