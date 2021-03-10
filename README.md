@@ -1,5 +1,7 @@
 # TelemetryMetricsStatsd
 
+[![Test](https://github.com/beam-telemetry/telemetry_metrics_statsd/actions/workflows/test.yml/badge.svg)](https://github.com/beam-telemetry/telemetry_metrics_statsd/actions/workflows/test.yml)
+
 `Telemetry.Metrics` reporter for StatsD-compatible metric servers (including DataDog).
 
 To use it, start the reporter with the `start_link/1` function, providing it a list of
