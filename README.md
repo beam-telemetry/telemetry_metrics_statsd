@@ -1,6 +1,6 @@
 # TelemetryMetricsStatsd
 
-[![CircleCI](https://circleci.com/gh/beam-telemetry/telemetry_metrics_statsd.svg?style=svg)](https://circleci.com/gh/beam-telemetry/telemetry_metrics_statsd)
+[![Test](https://github.com/beam-telemetry/telemetry_metrics_statsd/actions/workflows/test.yml/badge.svg)](https://github.com/beam-telemetry/telemetry_metrics_statsd/actions/workflows/test.yml)
 
 `Telemetry.Metrics` reporter for StatsD-compatible metric servers (including DataDog).
 
