@@ -22,7 +22,8 @@ defmodule TelemetryMetricsStatsd.UDP do
   @spec open(config()) ::
           {:ok, t()} | {:error, reason :: term()}
   def open(config) do
-    opts = if config[:socket_path], do: [:local], else: []
+    opts = [active: false]
+    opts = if config[:socket_path], do: [:local | opts], else: opts
 
     case :gen_udp.open(0, opts) do
       {:ok, socket} ->
