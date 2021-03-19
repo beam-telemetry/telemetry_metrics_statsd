@@ -419,13 +419,18 @@ defmodule TelemetryMetricsStatsd do
   end
 
   @doc false
-  @spec get_udp(:ets.tid()) :: UDP.t()
+  @spec get_udp(:ets.tid()) :: {:ok, UDP.t()} | :error
   def get_udp(pool_id) do
-    udps = :ets.lookup(pool_id, :udp)
+    # The table can be empty if the UDP error is reported for all the sockets.
+    case :ets.lookup(pool_id, :udp) do
+      [] ->
+        Logger.error("Failed to publish metrics over UDP: no open sockets available.")
+        :error
 
-    udps
-    |> Enum.random()
-    |> elem(1)
+      udps ->
+        {:udp, udp} = Enum.random(udps)
+        {:ok, udp}
+    end
   end
 
   @doc false
