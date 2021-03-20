@@ -317,13 +317,14 @@ defmodule TelemetryMetricsStatsd do
   require Record
 
   alias Telemetry.Metrics
-  alias TelemetryMetricsStatsd.{EventHandler, UDP}
+  alias TelemetryMetricsStatsd.{EventHandler, Options, UDP}
 
   @type prefix :: String.t() | atom() | nil
   @type host :: String.t() | :inet.ip_address()
   @type option ::
           {:port, :inet.port_number()}
           | {:host, host()}
+          | {:socket_path, Path.t()}
           | {:metrics, [Metrics.t()]}
           | {:mtu, non_neg_integer()}
           | {:prefix, prefix()}
@@ -331,10 +332,6 @@ defmodule TelemetryMetricsStatsd do
           | {:global_tags, Keyword.t()}
           | {:host_resolution_interval, non_neg_integer()}
   @type options :: [option]
-
-  @default_port 8125
-  @default_mtu 512
-  @default_formatter :standard
 
   Record.defrecordp(:hostent, Record.extract(:hostent, from_lib: "kernel/include/inet.hrl"))
 
@@ -358,27 +355,7 @@ defmodule TelemetryMetricsStatsd do
   Starts a reporter and links it to the calling process.
 
   The available options are:
-  * `:metrics` - a list of Telemetry.Metrics metric definitions which will be published by the
-    reporter
-  * `:host` - hostname or IP address of the StatsD server. Defaults to `{127, 0, 0, 1}`. Keep
-    in mind Erlang's UDP implementation looks up the hostname each time it sends a packet.
-    Furthermore, telemetry handlers are blocking. For latency-critical applications, it is best
-    to use an IP here (or resolve it on startup).
-  * `:port` - port number of the StatsD server. Defaults to `8125`.
-  * `:formatter` - determines the format of the metrics sent to the target server. Can be either
-    `:standard` or `:datadog`. Defaults to `:standard`.
-  * `:prefix` - a prefix prepended to the name of each metric published by the reporter. Defaults
-    to `nil`.
-  * `:mtu` - Maximum Transmission Unit of the link between your application and the StatsD server in
-    bytes. This value should not be greater than the actual MTU since this could lead to the data loss
-    when the metrics are published. Defaults to `512`.
-  * `:global_tags` - Additional default tag values to be sent along with every published metric. These
-    can be overriden by tags sent via the `:telemetry.execute` call.
-  * `:pool_size` - The number of UDP sockets to open to report metrics. Defaults to `1`.
-  * `:host_resolution_interval` - When set, makes the reporter resolve the hostname of the StatsD server
-    on a specified interval instead of looking it up once on start. Only applies when `:host` is a string
-    and no an IP address. If the provided hostname resolves to multiple IP addresses, the first one is used.
-
+  #{TelemetryMetricsStatsd.Options.docs()}
 
   You can read more about all the options in the `TelemetryMetricsStatsd` module documentation.
 
@@ -397,23 +374,13 @@ defmodule TelemetryMetricsStatsd do
   """
   @spec start_link(options) :: GenServer.on_start()
   def start_link(options) do
-    config =
-      options
-      |> Enum.into(%{})
-      |> Map.put_new(:host, {127, 0, 0, 1})
-      |> Map.update!(:host, fn host ->
-        if(is_binary(host), do: to_charlist(host), else: host)
-      end)
-      |> Map.put_new(:port, @default_port)
-      |> Map.put_new(:mtu, @default_mtu)
-      |> Map.put_new(:prefix, nil)
-      |> Map.put_new(:socket_path, nil)
-      |> Map.put_new(:formatter, @default_formatter)
-      |> Map.update!(:formatter, &validate_and_translate_formatter/1)
-      |> Map.put_new(:global_tags, Keyword.new())
-      |> Map.put_new(:pool_size, 1)
+    case Options.validate(options) do
+      {:ok, options} ->
+        GenServer.start_link(__MODULE__, options)
 
-    GenServer.start_link(__MODULE__, config)
+      {:error, _} = err ->
+        err
+    end
   end
 
   @doc false
@@ -444,18 +411,18 @@ defmodule TelemetryMetricsStatsd do
   end
 
   @impl true
-  def init(config) do
+  def init(options) do
     Process.flag(:trap_exit, true)
-    metrics = Map.fetch!(config, :metrics)
+    metrics = Map.fetch!(options, :metrics)
 
     udp_config =
-      case config.socket_path do
-        nil -> configure_host_resolution(config)
-        socket_path -> %{socket_path: socket_path}
+      case options.host do
+        {:local, _} = host -> %{host: host}
+        _ -> configure_host_resolution(options)
       end
 
     udps =
-      for _ <- 1..config.pool_size do
+      for _ <- 1..options.pool_size do
         {:ok, udp} = UDP.open(udp_config)
         {:udp, udp}
       end
@@ -468,10 +435,10 @@ defmodule TelemetryMetricsStatsd do
         metrics,
         self(),
         pool_id,
-        config.mtu,
-        config.prefix,
-        config.formatter,
-        config.global_tags
+        options.mtu,
+        options.prefix,
+        options.formatter,
+        options.global_tags
       )
 
     {:ok,
@@ -479,9 +446,9 @@ defmodule TelemetryMetricsStatsd do
        udp_config: udp_config,
        handler_ids: handler_ids,
        pool_id: pool_id,
-       host: config[:host],
-       port: config[:port],
-       host_resolution_interval: config[:host_resolution_interval]
+       host: options.host,
+       port: options.port,
+       host_resolution_interval: options.host_resolution_interval
      }}
   end
 
@@ -560,17 +527,12 @@ defmodule TelemetryMetricsStatsd do
     %{state | udp_config: %{udp_config | host: new_address}}
   end
 
-  defp validate_and_translate_formatter(:standard), do: TelemetryMetricsStatsd.Formatter.Standard
-  defp validate_and_translate_formatter(:datadog), do: TelemetryMetricsStatsd.Formatter.Datadog
-
-  defp validate_and_translate_formatter(_),
-    do: raise(ArgumentError, ":formatter needs to be either :standard or :datadog")
-
   defp configure_host_resolution(%{host: host, port: port}) when is_tuple(host) do
     %{host: host, port: port}
   end
 
-  defp configure_host_resolution(%{host: host, port: port, host_resolution_interval: interval}) do
+  defp configure_host_resolution(%{host: host, port: port, host_resolution_interval: interval})
+       when is_integer(interval) do
     {:ok, hostent(h_addr_list: [ip | _ips])} = :inet.gethostbyname(host)
     Process.send_after(self(), :resolve_host, interval)
     %{host: ip, port: port}
