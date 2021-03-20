@@ -587,16 +587,14 @@ defmodule TelemetryMetricsStatsdTest do
     assert_reported(socket, "http.requests:1|c")
   end
 
-  describe "periodic hostname resolution" do
-    test "is performed when configured" do
+  describe "hostname resolution" do
+    test "is performed on start by default" do
       counter = given_counter("http.request.count")
 
       reporter =
         start_reporter(
           host: "localhost",
-          metrics: [counter],
-          name: :my_statsd,
-          host_resolution_interval: 5000
+          metrics: [counter]
         )
 
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
@@ -605,14 +603,37 @@ defmodule TelemetryMetricsStatsdTest do
       assert udp.host == {127, 0, 0, 1}
     end
 
-    test "is periodically repeated" do
+    test "is not periodically repeated by default" do
+      counter = given_counter("http.request.count")
+
+      reporter =
+        start_reporter(
+          host: "localhost",
+          metrics: [counter]
+        )
+
+      pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
+      udp = TelemetryMetricsStatsd.get_udp(pool_id)
+      assert udp.host == {127, 0, 0, 1}
+
+      with_mock :inet, [:passthrough, :unstick],
+        gethostbyname: fn _ -> {:ok, {:hostent, 'localhost', [], :inet, 4, [{10, 0, 0, 0}]}} end do
+        assert_raise Liveness, fn ->
+          eventually(fn ->
+            udp = TelemetryMetricsStatsd.get_udp(pool_id)
+            udp.host == {10, 0, 0, 0}
+          end)
+        end
+      end
+    end
+
+    test "is periodically repeated if configured" do
       counter = given_counter("http.request.count")
 
       reporter =
         start_reporter(
           host: "localhost",
           metrics: [counter],
-          name: :my_statsd,
           host_resolution_interval: 100
         )
 

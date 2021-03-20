@@ -376,10 +376,8 @@ defmodule TelemetryMetricsStatsd do
     can be overriden by tags sent via the `:telemetry.execute` call.
   * `:pool_size` - The number of UDP sockets to open to report metrics. Defaults to `1`.
   * `:host_resolution_interval` - When set, makes the reporter resolve the hostname of the StatsD server
-    on a specified interval instead of looking up the hostname on every packet send using the system DNS
-    stack. This can improve the performance of publishing metrics while still allowing for dynamic
-    hostname resolution. Only applies when `:host` is a string and no an IP address. If the provided hostname
-    resolves to multiple IP addresses, the first one is used.
+    on a specified interval instead of looking it up once on start. Only applies when `:host` is a string
+    and no an IP address. If the provided hostname resolves to multiple IP addresses, the first one is used.
 
 
   You can read more about all the options in the `TelemetryMetricsStatsd` module documentation.
@@ -574,7 +572,8 @@ defmodule TelemetryMetricsStatsd do
   end
 
   defp configure_host_resolution(%{host: host, port: port}) do
-    %{host: host, port: port}
+    {:ok, hostent(h_addr_list: [ip | _ips])} = :inet.gethostbyname(host)
+    %{host: ip, port: port}
   end
 
   defp update_pool(pool_id, new_host, new_port) do
