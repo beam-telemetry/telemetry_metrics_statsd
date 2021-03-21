@@ -71,7 +71,7 @@ defmodule TelemetryMetricsStatsd.Options do
     NimbleOptions.docs(@schema)
   end
 
-  @spec validate(Keyword.t()) :: {:ok, Keyword.t()} | {:error, String.t()}
+  @spec validate(Keyword.t()) :: {:ok, struct()} | {:error, String.t()}
   def validate(options) do
     case NimbleOptions.validate(options, @schema) do
       {:ok, options} ->
