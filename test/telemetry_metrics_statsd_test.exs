@@ -137,9 +137,10 @@ defmodule TelemetryMetricsStatsdTest do
   test "it fails to start with invalid formatter" do
     counter = given_counter("http.request.count")
 
-    assert_raise ArgumentError, fn ->
-      start_reporter(metrics: [counter], formatter: :my_formatter)
-    end
+    assert {:error, msg} =
+             TelemetryMetricsStatsd.start_link(metrics: [counter], formatter: :my_formatter)
+
+    assert msg == "expected :formatter be either :standard or :datadog, got :my_formatter"
   end
 
   test "it doesn't crash when tag values are missing" do
