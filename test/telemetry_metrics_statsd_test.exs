@@ -381,7 +381,7 @@ defmodule TelemetryMetricsStatsdTest do
 
     @tag :capture_log
     test "reporting a UDP error and opening a new socket closes the old socket" do
-      reporter = start_reporter(metrics: [])
+      reporter = start_reporter(metrics: [], pool_size: 1)
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
       {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
 
