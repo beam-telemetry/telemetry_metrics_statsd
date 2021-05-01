@@ -45,7 +45,7 @@ defmodule TelemetryMetricsStatsd.Options do
     ],
     pool_size: [
       type: :non_neg_integer,
-      default: 1,
+      default: 10,
       doc: "A number of UDP sockets used for publishing metrics."
     ],
     host_resolution_interval: [
