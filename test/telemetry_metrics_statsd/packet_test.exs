@@ -23,9 +23,7 @@ defmodule TelemetryMetricsStatsd.PacketTest do
           next_binary = Enum.at(binaries, 0)
 
           assert byte_size(packet <> joiner <> next_binary) > max_packet_size,
-                 "packets: #{inspect(packets)}, packet: #{inspect(packet)}, next_binary: #{
-                   inspect(next_binary)
-                 }, left binaries: #{inspect(binaries)}, packet_size: #{packet_size}"
+                 "packets: #{inspect(packets)}, packet: #{inspect(packet)}, next_binary: #{inspect(next_binary)}, left binaries: #{inspect(binaries)}, packet_size: #{packet_size}"
         end
 
         binaries
