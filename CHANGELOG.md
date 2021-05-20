@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0](https://github.com/beam-telemetry/telemetry_metrics_statsd/tree/v0.6.0)
+
+This release comes with performance improvements and better defaults for hostname resolution.
+
+Changes to hostname resolution are a _potentially breaking change_. Specifically, previouslyby default the reporter would send the packet using the hostname as a target, which means the hostname would be resolved using the default DNS stack of the runtime on every send, which is expensive. Now the reporter resolves the hostname once on startup and sends the metrics to the resolved IP. If the IP address of your target host is not static, configure the `:host_resolution_interval` accordingly when updating to this version.
+
+#### Changed
+
+- Increase the default pool size to 10. (#56)
+- Resolve the target hostname to IP address when the reporter starts. (#52)
+
+#### Fixed
+
+- Gracefully handle the situation where the pool is empty due repeated errors on send. (#54)
+
 ## [0.5.0](https://github.com/beam-telemetry/telemetry_metrics_statsd/tree/v0.5.0)
 
 This release brings a few new features, performance improvements, but also one backwards-incompatible change.
@@ -66,7 +81,7 @@ And last but not least, we have a few enhancements in how Telemetry.Metrics map 
 
 #### Changed
 
--  Change the default host from `localhost` to `127.0.0.1` in order to skip redundant IP address lookup (#23), by @hkrutzer.
+- Change the default host from `localhost` to `127.0.0.1` in order to skip redundant IP address lookup (#23), by @hkrutzer.
 
 ## [0.3.0](https://github.com/beam-telemetry/telemetry_metrics_statsd/tree/v0.3.0)
 
