@@ -6,7 +6,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [0.6.0](https://github.com/beam-telemetry/telemetry_metrics_statsd/tree/v0.6.0)
 
-This relase comes with performance improvements and better defaults for hostname resolution.
+This release comes with performance improvements and better defaults for hostname resolution.
 
 Changes to hostname resolution are a _potentially breaking change_. Specifically, previouslyby default the reporter would send the packet using the hostname as a target, which means the hostname would be resolved using the default DNS stack of the runtime on every send, which is expensive. Now the reporter resolves the hostname once on startup and sends the metrics to the resolved IP. If the IP address of your target host is not static, configure the `:host_resolution_interval` accordingly when updating to this version.
 
