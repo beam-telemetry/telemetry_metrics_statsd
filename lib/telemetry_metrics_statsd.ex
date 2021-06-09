@@ -60,7 +60,7 @@ defmodule TelemetryMetricsStatsd do
     * if the metric name was provided as a string, e.g. `"http.request.count"`, it is sent to
       StatsD server as-is
     * if the metric name was provided as a list of atoms, e.g. `[:http, :request, :count]`, it is
-      first converted to a string by joiging the segments with dots. In this example, the StatsD
+      first converted to a string by joining the segments with dots. In this example, the StatsD
       metric name would be `"http.request.count"` as well
 
   Since there are multiple implementations of StatsD and each of them provides slightly different
