@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1](https://github.com/beam-telemetry/telemetry_metrics_statsd/tree/v0.6.1)
+
+This release adds support for telemetry 1.0.
+
 ## [0.6.0](https://github.com/beam-telemetry/telemetry_metrics_statsd/tree/v0.6.0)
 
 This release comes with performance improvements and better defaults for hostname resolution.
