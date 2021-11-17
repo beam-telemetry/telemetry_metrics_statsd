@@ -23,7 +23,6 @@ defmodule TelemetryMetricsStatsd.Options do
     ],
     socket_path: [
       type: {:custom, __MODULE__, :socket_path, []},
-      rename_to: :host,
       doc: "Path to the Unix Domain Socket used for publishing instead of the hostname and port."
     ],
     formatter: [
@@ -75,6 +74,7 @@ defmodule TelemetryMetricsStatsd.Options do
   def validate(options) do
     case NimbleOptions.validate(options, @schema) do
       {:ok, options} ->
+        options = rename_socket_path(options)
         {:ok, struct(__MODULE__, options)}
 
       {:error, err} ->
@@ -114,4 +114,14 @@ defmodule TelemetryMetricsStatsd.Options do
 
   def formatter(term),
     do: {:error, "expected :formatter be either :standard or :datadog, got #{inspect(term)}"}
+
+  defp rename_socket_path(opts) do
+    if socket_path = Keyword.get(opts, :socket_path) do
+      opts
+      |> Keyword.put(:host, socket_path)
+      |> Keyword.delete(:socket_path)
+    else
+      opts
+    end
+  end
 end
