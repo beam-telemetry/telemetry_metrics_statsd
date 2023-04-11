@@ -2,12 +2,12 @@ defmodule TelemetryMetricsStatsd.EventHandler do
   @moduledoc false
 
   alias Telemetry.Metrics
-  alias TelemetryMetricsStatsd.{Formatter, Packet, UDP}
+  alias TelemetryMetricsStatsd.{Formatter, Packet, UDP, Pool}
 
   @spec attach(
           [Metrics.t()],
           reporter :: pid(),
-          pool_id :: :ets.tid(),
+          pool_id :: atom,
           mtu :: non_neg_integer(),
           prefix :: String.t() | nil,
           formatter :: Formatter.t(),
@@ -125,24 +125,19 @@ defmodule TelemetryMetricsStatsd.EventHandler do
     end
   end
 
-  @spec publish_metrics(pid(), :ets.tid(), [binary()]) :: :ok
+  @spec publish_metrics(pid(), atom, [binary()]) :: :ok
   defp publish_metrics(reporter, pool_id, packets) do
-    case TelemetryMetricsStatsd.get_udp(pool_id) do
-      {:ok, pid} ->
-        Enum.reduce_while(packets, :cont, fn packet, :cont ->
-          case UDP.send(pid, packet) do
-            :ok ->
-              {:cont, :cont}
+    name = Pool.get_udp(pool_id)
+    Enum.reduce_while(packets, :cont, fn packet, :cont ->
+      case UDP.send(name, packet) do
+        :ok ->
+          {:cont, :cont}
 
-            {:error, reason} ->
-              TelemetryMetricsStatsd.udp_error(reporter, pid, reason)
-              {:halt, :halt}
-          end
-        end)
-
-      :error ->
-        :ok
-    end
+        {:error, reason} ->
+          TelemetryMetricsStatsd.udp_error(reporter, name, reason)
+          {:halt, :halt}
+      end
+    end)
   end
 
   @spec sample(Metrics.t()) :: Metrics.measurement() | nil

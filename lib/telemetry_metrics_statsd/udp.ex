@@ -2,6 +2,7 @@ defmodule TelemetryMetricsStatsd.UDP do
   @moduledoc false
 
   use GenServer
+  require Logger
 
   defstruct [:host, :port, :socket]
 
@@ -20,7 +21,7 @@ defmodule TelemetryMetricsStatsd.UDP do
     GenServer.start_link(__MODULE__, options)
   end
 
-  @spec send(pid, iodata) :: :ok | {:error, term}
+  @spec send(GenServer.name(), iodata) :: :ok | {:error, term}
   def send(pid, data) do
     GenServer.call(pid, {:send, data})
   end
@@ -33,6 +34,9 @@ defmodule TelemetryMetricsStatsd.UDP do
     GenServer.call(pid, :close)
   end
 
+  def stop(pid, reason) do
+    GenServer.stop(pid, reason)
+  end
 
   @impl true
   def init(config) do

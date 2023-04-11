@@ -6,6 +6,8 @@ defmodule TelemetryMetricsStatsdTest do
   import Liveness
   import Mock
 
+  alias TelemetryMetricsStatsd.Pool
+
   test "counter metric is reported as StatsD counter with 1 as a value" do
     {socket, port} = given_udp_port_opened()
     counter = given_counter("http.requests", event_name: "http.request")
@@ -329,70 +331,39 @@ defmodule TelemetryMetricsStatsdTest do
     test "reporting a UDP error logs an error" do
       reporter = start_reporter(metrics: [])
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
-      {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
+      udp = Process.whereis(Pool.get_udp(pool_id))
 
       assert capture_log(fn ->
                TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
                # errors.
                eventually(fn ->
-                 {:ok, new_udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-                 new_udp != udp
+                 Process.whereis(Pool.get_udp(pool_id)) != udp
                end)
              end) =~ ~r/\[error\] Failed to publish metrics over UDP: :closed/
-    end
-
-    test "reporting a UDP error for the same socket multiple times generates only one log" do
-      reporter = start_reporter(metrics: [])
-      pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
-      {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-
-      assert capture_log(fn ->
-               TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
-
-               eventually(fn ->
-                 {:ok, new_udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-                 new_udp != udp
-               end)
-             end) =~ ~r/\[error\] Failed to publish metrics over UDP: :closed/
-
-      assert capture_log(fn ->
-               TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
-
-               eventually(fn ->
-                 {:ok, new_udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-                 new_udp != udp
-               end)
-             end) == ""
     end
 
     @tag :capture_log
     test "reporting a UDP error and fetching a socket returns a new socket" do
       reporter = start_reporter(metrics: [], pool_size: 1)
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
-      {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
+      udp = Process.whereis(Pool.get_udp(pool_id))
 
       TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
 
-      assert eventually(fn ->
-               {:ok, new_udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-               new_udp != udp
-             end)
+      assert eventually(fn -> Process.whereis(Pool.get_udp(pool_id)) != udp end)
     end
 
     @tag :capture_log
     test "reporting a UDP error and opening a new socket closes the old socket" do
       reporter = start_reporter(metrics: [], pool_size: 1)
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
-      {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
+      udp = Process.whereis(Pool.get_udp(pool_id))
 
       TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
 
-      eventually(fn ->
-        {:ok, new_udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-        new_udp != udp
-      end)
+      eventually(fn -> Process.whereis(Pool.get_udp(pool_id)) != udp end)
 
-      assert :gen_udp.recv(udp_socket(udp), 0) == {:error, :closed}
+      eventually(fn -> Process.alive?(udp) == false end)
     end
   end
 
@@ -586,13 +557,7 @@ defmodule TelemetryMetricsStatsdTest do
     reporter = start_reporter(metrics: [], pool_size: 4)
     pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
 
-    udps =
-      for _ <- 1..50, uniq: true do
-        {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-        udp
-      end
-
-    assert length(udps) == 4
+    assert length(Pool.get_workers(pool_id)) == 4
   end
 
   test "multiple reporters can be started" do
@@ -612,37 +577,25 @@ defmodule TelemetryMetricsStatsdTest do
     test "is performed on start by default" do
       counter = given_counter("http.request.count")
 
-      reporter =
-        start_reporter(
-          host: "localhost",
-          metrics: [counter]
-        )
+      reporter = start_reporter(host: "localhost", metrics: [counter])
 
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
-
-      {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-      assert udp_host(udp) == {127, 0, 0, 1}
+      assert udp_host(Pool.get_udp(pool_id)) == {127, 0, 0, 1}
     end
 
     test "is not periodically repeated by default" do
       counter = given_counter("http.request.count")
 
-      reporter =
-        start_reporter(
-          host: "localhost",
-          metrics: [counter]
-        )
-
+      reporter = start_reporter(host: "localhost", metrics: [counter])
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
-      {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-      assert udp_host(udp) == {127, 0, 0, 1}
+
+      assert udp_host(Pool.get_udp(pool_id)) == {127, 0, 0, 1}
 
       with_mock :inet, [:passthrough, :unstick],
         gethostbyname: fn _ -> {:ok, {:hostent, 'localhost', [], :inet, 4, [{10, 0, 0, 0}]}} end do
         assert_raise Liveness, fn ->
           eventually(fn ->
-            {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-            udp_host(udp) == {10, 0, 0, 0}
+            udp_host(Pool.get_udp(pool_id)) == {10, 0, 0, 0}
           end)
         end
       end
@@ -651,28 +604,24 @@ defmodule TelemetryMetricsStatsdTest do
     test "is periodically repeated if configured" do
       counter = given_counter("http.request.count")
 
-      reporter =
-        start_reporter(
-          host: "localhost",
-          metrics: [counter],
-          host_resolution_interval: 100
-        )
-
+      reporter = start_reporter(
+        host: "localhost",
+        metrics: [counter],
+        host_resolution_interval: 100
+      )
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
-      {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-      assert udp_host(udp) == {127, 0, 0, 1}
+
+      assert udp_host(Pool.get_udp(pool_id)) == {127, 0, 0, 1}
 
       with_mock :inet, [:passthrough, :unstick],
         gethostbyname: fn _ -> {:ok, {:hostent, 'localhost', [], :inet, 4, [{10, 0, 0, 0}]}} end do
         eventually(fn ->
-          {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-          assert udp_host(udp) == {10, 0, 0, 0}
+          assert udp_host(Pool.get_udp(pool_id)) == {10, 0, 0, 0}
         end)
       end
 
       eventually(fn ->
-        {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-        assert udp_host(udp) == {127, 0, 0, 1}
+        assert udp_host(Pool.get_udp(pool_id)) == {127, 0, 0, 1}
       end)
     end
   end
@@ -705,11 +654,12 @@ defmodule TelemetryMetricsStatsdTest do
     assert {:error, :timeout} = :gen_udp.recv(socket, 0, 1000)
   end
 
-  defp udp_host(pid) do
-    :sys.get_state(pid).host
+  defp get_state(pid) do
+    {:state, _name, _mod, state, _opts} = :sys.get_state(pid)
+    state
   end
 
-  defp udp_socket(pid) do
-    :sys.get_state(pid).socket
+  defp udp_host(pid) do
+    get_state(pid).host
   end
 end
