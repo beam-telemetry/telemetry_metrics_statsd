@@ -128,14 +128,14 @@ defmodule TelemetryMetricsStatsd.EventHandler do
   @spec publish_metrics(pid(), :ets.tid(), [binary()]) :: :ok
   defp publish_metrics(reporter, pool_id, packets) do
     case TelemetryMetricsStatsd.get_udp(pool_id) do
-      {:ok, udp} ->
+      {:ok, pid} ->
         Enum.reduce_while(packets, :cont, fn packet, :cont ->
-          case UDP.send(udp, packet) do
+          case UDP.send(pid, packet) do
             :ok ->
               {:cont, :cont}
 
             {:error, reason} ->
-              TelemetryMetricsStatsd.udp_error(reporter, udp, reason)
+              TelemetryMetricsStatsd.udp_error(reporter, pid, reason)
               {:halt, :halt}
           end
         end)

@@ -392,7 +392,7 @@ defmodule TelemetryMetricsStatsdTest do
         new_udp != udp
       end)
 
-      assert :gen_udp.recv(udp.socket, 0) == {:error, :closed}
+      assert :gen_udp.recv(udp_socket(udp), 0) == {:error, :closed}
     end
   end
 
@@ -621,7 +621,7 @@ defmodule TelemetryMetricsStatsdTest do
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
 
       {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-      assert udp.host == {127, 0, 0, 1}
+      assert udp_host(udp) == {127, 0, 0, 1}
     end
 
     test "is not periodically repeated by default" do
@@ -635,14 +635,14 @@ defmodule TelemetryMetricsStatsdTest do
 
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
       {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-      assert udp.host == {127, 0, 0, 1}
+      assert udp_host(udp) == {127, 0, 0, 1}
 
       with_mock :inet, [:passthrough, :unstick],
         gethostbyname: fn _ -> {:ok, {:hostent, 'localhost', [], :inet, 4, [{10, 0, 0, 0}]}} end do
         assert_raise Liveness, fn ->
           eventually(fn ->
             {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-            udp.host == {10, 0, 0, 0}
+            udp_host(udp) == {10, 0, 0, 0}
           end)
         end
       end
@@ -660,19 +660,19 @@ defmodule TelemetryMetricsStatsdTest do
 
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
       {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-      assert udp.host == {127, 0, 0, 1}
+      assert udp_host(udp) == {127, 0, 0, 1}
 
       with_mock :inet, [:passthrough, :unstick],
         gethostbyname: fn _ -> {:ok, {:hostent, 'localhost', [], :inet, 4, [{10, 0, 0, 0}]}} end do
         eventually(fn ->
           {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-          assert udp.host == {10, 0, 0, 0}
+          assert udp_host(udp) == {10, 0, 0, 0}
         end)
       end
 
       eventually(fn ->
         {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-        assert udp.host == {127, 0, 0, 1}
+        assert udp_host(udp) == {127, 0, 0, 1}
       end)
     end
   end
@@ -703,5 +703,13 @@ defmodule TelemetryMetricsStatsdTest do
 
   defp refute_reported(socket) do
     assert {:error, :timeout} = :gen_udp.recv(socket, 0, 1000)
+  end
+
+  defp udp_host(pid) do
+    :sys.get_state(pid).host
+  end
+
+  defp udp_socket(pid) do
+    :sys.get_state(pid).socket
   end
 end

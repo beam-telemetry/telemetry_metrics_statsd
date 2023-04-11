@@ -384,7 +384,7 @@ defmodule TelemetryMetricsStatsd do
   end
 
   @doc false
-  @spec get_udp(:ets.tid()) :: {:ok, UDP.t()} | :error
+  @spec get_udp(:ets.tid()) :: {:ok, pid} | :error
   def get_udp(pool_id) do
     # The table can be empty if the UDP error is reported for all the sockets.
     case :ets.lookup(pool_id, :udp) do
@@ -405,7 +405,7 @@ defmodule TelemetryMetricsStatsd do
   end
 
   @doc false
-  @spec udp_error(pid(), UDP.t(), reason :: term) :: :ok
+  @spec udp_error(pid(), pid(), reason :: term) :: :ok
   def udp_error(reporter, udp, reason) do
     GenServer.cast(reporter, {:udp_error, udp, reason})
   end
@@ -423,8 +423,8 @@ defmodule TelemetryMetricsStatsd do
 
     udps =
       for _ <- 1..options.pool_size do
-        {:ok, udp} = UDP.open(udp_config)
-        {:udp, udp}
+        {:ok, pid} = UDP.start_link(udp_config)
+        {:udp, pid}
       end
 
     pool_id = :ets.new(__MODULE__, [:bag, :protected, read_concurrency: true])
@@ -462,9 +462,9 @@ defmodule TelemetryMetricsStatsd do
       UDP.close(old_udp)
       :ets.delete_object(pool_id, old_entry)
 
-      case UDP.open(state.udp_config) do
-        {:ok, udp} ->
-          :ets.insert(pool_id, {:udp, udp})
+      case UDP.start_link(state.udp_config) do
+        {:ok, pid} ->
+          :ets.insert(pool_id, {:udp, pid})
           {:noreply, state}
 
         {:error, reason} ->
@@ -546,10 +546,8 @@ defmodule TelemetryMetricsStatsd do
   defp update_pool(pool_id, new_host, new_port) do
     pool_id
     |> :ets.tab2list()
-    |> Enum.each(fn {:udp, udp} ->
-      :ets.delete_object(pool_id, {:udp, udp})
-      updated_udp = UDP.update(udp, new_host, new_port)
-      :ets.insert(pool_id, {:udp, updated_udp})
+    |> Enum.each(fn {:udp, pid} ->
+      UDP.update(pid, new_host, new_port)
     end)
   end
 end

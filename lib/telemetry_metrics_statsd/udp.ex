@@ -1,6 +1,8 @@
 defmodule TelemetryMetricsStatsd.UDP do
   @moduledoc false
 
+  use GenServer
+
   defstruct [:host, :port, :socket]
 
   @opaque t :: %__MODULE__{
@@ -14,9 +16,26 @@ defmodule TelemetryMetricsStatsd.UDP do
           optional(:port) => :inet.port_number()
         }
 
-  @spec open(config()) ::
-          {:ok, t()} | {:error, reason :: term()}
-  def open(config) do
+  def start_link(options) do
+    GenServer.start_link(__MODULE__, options)
+  end
+
+  @spec send(pid, iodata) :: :ok | {:error, term}
+  def send(pid, data) do
+    GenServer.call(pid, {:send, data})
+  end
+
+  def update(pid, new_host, new_port) do
+    GenServer.call(pid, {:update, new_host, new_port})
+  end
+
+  def close(pid) do
+    GenServer.call(pid, :close)
+  end
+
+
+  @impl true
+  def init(config) do
     opts = [active: false]
 
     opts =
@@ -30,32 +49,33 @@ defmodule TelemetryMetricsStatsd.UDP do
 
     case :gen_udp.open(0, opts) do
       {:ok, socket} ->
-        udp = struct(__MODULE__, Map.put(config, :socket, socket))
-        {:ok, udp}
-
-      {:error, _} = err ->
-        err
+        state = struct(__MODULE__, Map.put(config, :socket, socket))
+        {:ok, state}
     end
   end
 
-  @spec send(t(), iodata()) :: :ok | {:error, reason :: term()}
-  def send(%__MODULE__{host: host, port: port, socket: socket}, data) do
-    case host do
-      {:local, _} ->
-        :gen_udp.send(socket, host, 0, data)
-
-      _ ->
-        :gen_udp.send(socket, host, port, data)
-    end
+  @impl true
+  def handle_call({:update, new_host, new_port}, _from, state) do
+    {:noreply, %__MODULE__{state | host: new_host, port: new_port}}
   end
 
-  @spec update(t(), :inet.hostname() | :inet.ip_address(), :inet.port_number()) :: t()
-  def update(%__MODULE__{} = udp, new_host, new_port) do
-    %__MODULE__{udp | host: new_host, port: new_port}
+  @impl true
+  def handle_call({:send, data}, _from, %__MODULE__{host: host, port: port, socket: socket} = state) do
+    result =
+      case host do
+        {:local, _} ->
+          :gen_udp.send(socket, host, 0, data)
+
+        _ ->
+          :gen_udp.send(socket, host, port, data)
+      end
+
+    {:reply, result, state}
   end
 
-  @spec close(t()) :: :ok
-  def close(%__MODULE__{socket: socket}) do
+  @impl true
+  def handle_call(:close, _from, %__MODULE__{socket: socket} = state) do
     :gen_udp.close(socket)
+    {:reply, :ok, state}
   end
 end
