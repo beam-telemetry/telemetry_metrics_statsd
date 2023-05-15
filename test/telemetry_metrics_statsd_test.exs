@@ -140,7 +140,8 @@ defmodule TelemetryMetricsStatsdTest do
     assert {:error, msg} =
              TelemetryMetricsStatsd.start_link(metrics: [counter], formatter: :my_formatter)
 
-    assert msg == "expected :formatter be either :standard or :datadog, got :my_formatter"
+    assert msg ==
+             "invalid value for :formatter option: expected :formatter be either :standard or :datadog, got :my_formatter"
   end
 
   test "it doesn't crash when tag values are missing" do
