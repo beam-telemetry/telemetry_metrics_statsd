@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.3](https://github.com/beam-telemetry/telemetry_metrics_statsd/tree/v0.6.2)
+
+#### Added
+
+- Allow usage of the library with NimbleOptions ~> 1.0. (#74)
+
 ## [0.6.2](https://github.com/beam-telemetry/telemetry_metrics_statsd/tree/v0.6.2)
 
 #### Fixed
