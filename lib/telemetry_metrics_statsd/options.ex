@@ -21,6 +21,11 @@ defmodule TelemetryMetricsStatsd.Options do
       default: 8125,
       doc: "Port of the StatsD server."
     ],
+    inet_address_family: [
+      type: {:in, [:inet, :inet6, :local]},
+      default: :inet,
+      doc: "The inet address family, as specified by the Erlang `:inet.address_family type()`."
+    ],
     socket_path: [
       type: {:custom, __MODULE__, :socket_path, []},
       doc: "Path to the Unix Domain Socket used for publishing instead of the hostname and port."

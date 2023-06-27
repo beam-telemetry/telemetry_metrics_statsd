@@ -532,20 +532,34 @@ defmodule TelemetryMetricsStatsd do
     %{state | udp_config: %{udp_config | host: new_address}}
   end
 
-  defp configure_host_resolution(%{host: host, port: port}) when is_tuple(host) do
-    %{host: host, port: port}
+  defp configure_host_resolution(%{
+         host: host,
+         port: port,
+         inet_address_family: inet_address_family
+       })
+       when is_tuple(host) do
+    %{host: host, port: port, inet_address_family: inet_address_family}
   end
 
-  defp configure_host_resolution(%{host: host, port: port, host_resolution_interval: interval})
+  defp configure_host_resolution(%{
+         host: host,
+         port: port,
+         inet_address_family: inet_address_family,
+         host_resolution_interval: interval
+       })
        when is_integer(interval) do
-    {:ok, hostent(h_addr_list: [ip | _ips])} = :inet.gethostbyname(host)
+    {:ok, hostent(h_addr_list: [ip | _ips])} = :inet.gethostbyname(host, inet_address_family)
     Process.send_after(self(), :resolve_host, interval)
-    %{host: ip, port: port}
+    %{host: ip, port: port, inet_address_family: inet_address_family}
   end
 
-  defp configure_host_resolution(%{host: host, port: port}) do
-    {:ok, hostent(h_addr_list: [ip | _ips])} = :inet.gethostbyname(host)
-    %{host: ip, port: port}
+  defp configure_host_resolution(%{
+         host: host,
+         port: port,
+         inet_address_family: inet_address_family
+       }) do
+    {:ok, hostent(h_addr_list: [ip | _ips])} = :inet.gethostbyname(host, inet_address_family)
+    %{host: ip, port: port, inet_address_family: inet_address_family}
   end
 
   defp update_pool(pool_id, new_host, new_port) do

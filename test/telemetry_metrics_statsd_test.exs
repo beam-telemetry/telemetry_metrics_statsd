@@ -609,6 +609,17 @@ defmodule TelemetryMetricsStatsdTest do
     assert_reported(socket, "http.requests:1|c")
   end
 
+  test "IPv6 end-to-end test" do
+    {socket, port} = given_udp_port_opened(:inet6)
+    counter = given_counter("http.requests", event_name: "http.request")
+
+    start_reporter(host: "::1", inet_address_family: :inet6, metrics: [counter], port: port)
+
+    :telemetry.execute([:http, :request], %{latency: 211})
+
+    assert_reported(socket, "http.requests:1|c")
+  end
+
   describe "hostname resolution" do
     test "is performed on start by default" do
       counter = given_counter("http.request.count")
@@ -623,6 +634,22 @@ defmodule TelemetryMetricsStatsdTest do
 
       {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
       assert udp.host == {127, 0, 0, 1}
+    end
+
+    test "Supports IPv6" do
+      counter = given_counter("http.request.count")
+
+      reporter =
+        start_reporter(
+          host: "::1",
+          inet_address_family: :inet6,
+          metrics: [counter]
+        )
+
+      pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
+
+      {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
+      assert udp.host == {0, 0, 0, 0, 0, 0, 0, 1}
     end
 
     test "is not periodically repeated by default" do
@@ -678,8 +705,8 @@ defmodule TelemetryMetricsStatsdTest do
     end
   end
 
-  defp given_udp_port_opened() do
-    {:ok, socket} = :gen_udp.open(0, [:binary, active: false])
+  defp given_udp_port_opened(inet_address_family \\ :inet) do
+    {:ok, socket} = :gen_udp.open(0, [:binary, inet_address_family, active: false])
     {:ok, port} = :inet.port(socket)
     {socket, port}
   end
