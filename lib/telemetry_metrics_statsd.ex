@@ -335,6 +335,10 @@ defmodule TelemetryMetricsStatsd do
 
   Record.defrecordp(:hostent, Record.extract(:hostent, from_lib: "kernel/include/inet.hrl"))
 
+  # TODO: remove this when we depend on Elixir 1.11+, where Logger.warning/1
+  # was introduced.
+  @log_level_warning if macro_exported?(Logger, :warning, 1), do: :warning, else: :warn
+
   @doc """
   Reporter's child spec.
 
@@ -502,7 +506,8 @@ defmodule TelemetryMetricsStatsd do
           end
 
         {:error, reason} ->
-          Logger.warn(
+          Logger.log(
+            @log_level_warning,
             "Failed to resolve the hostname #{host}: #{inspect(reason)}. " <>
               "Using the previously resolved address of #{:inet.ntoa(current_address)}."
           )
