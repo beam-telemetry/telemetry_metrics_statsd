@@ -7,6 +7,10 @@ defmodule TelemetryMetricsStatsd.Formatter.Standard do
 
   require Logger
 
+  # TODO: remove this when we depend on Elixir 1.11+, where Logger.warning/1
+  # was introduced.
+  @log_level_warning if macro_exported?(Logger, :warning, 1), do: :warning, else: :warn
+
   @impl true
   def format(metric, value, tags) do
     case format_metric_tags(tags) do
@@ -83,7 +87,8 @@ defmodule TelemetryMetricsStatsd.Formatter.Standard do
     do: [value |> round() |> :erlang.integer_to_binary(), "|c"]
 
   defp format_counter_metric_value(%Metrics.Sum{}, value) do
-    Logger.warn(
+    Logger.log(
+      @log_level_warning,
       "Unable to format negative value: #{inspect(value)} for reporting to StatsD Counter"
     )
 
