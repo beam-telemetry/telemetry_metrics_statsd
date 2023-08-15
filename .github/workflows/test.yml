@@ -35,8 +35,11 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        otp: ["22.3", "24.0"]
-        elixir: ["1.10.4", "1.12.0"]
+        include:
+          - otp: 22.3
+            elixir: 1.10.4
+          - otp: 24.0
+            elixir: 1.12.0
     steps:
       - uses: actions/checkout@v2
       - uses: erlef/setup-beam@v1
@@ -69,8 +72,11 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        otp: ["22.3", "24.0"]
-        elixir: ["1.10.4", "1.12.0"]
+        include:
+          - otp: 22.3
+            elixir: 1.10.4
+          - otp: 24.0
+            elixir: 1.12.0
     steps:
       - uses: actions/checkout@v2
       - uses: erlef/setup-beam@v1
