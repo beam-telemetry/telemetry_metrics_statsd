@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: erlef/setup-elixir@v1
+      - uses: erlef/setup-beam@v1
         with:
           otp-version: "24.0"
           elixir-version: "1.12.0"
@@ -29,6 +29,7 @@ jobs:
             deps-
       - run: mix deps.get
       - run: mix format --check-formatted
+
   test:
     name: Test on Elixir ${{ matrix.elixir }} (OTP ${{ matrix.otp }})
     runs-on: ubuntu-latest
@@ -38,7 +39,7 @@ jobs:
         elixir: ["1.10.4", "1.12.0"]
     steps:
       - uses: actions/checkout@v2
-      - uses: erlef/setup-elixir@v1
+      - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{ matrix.otp }}
           elixir-version: ${{ matrix.elixir }}
@@ -72,7 +73,7 @@ jobs:
         elixir: ["1.10.4", "1.12.0"]
     steps:
       - uses: actions/checkout@v2
-      - uses: erlef/setup-elixir@v1
+      - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{ matrix.otp }}
           elixir-version: ${{ matrix.elixir }}
