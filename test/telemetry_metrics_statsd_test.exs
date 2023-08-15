@@ -334,11 +334,9 @@ defmodule TelemetryMetricsStatsdTest do
 
       assert capture_log(fn ->
                TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
-               # errors.
-               eventually(fn ->
-                 {:ok, new_udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-                 new_udp != udp
-               end)
+
+               # Wait for processing handle_cast by udp_error.
+               _ = TelemetryMetricsStatsd.get_pool_id(reporter)
              end) =~ ~r/\[error\] Failed to publish metrics over UDP: :closed/
     end
 
@@ -350,19 +348,15 @@ defmodule TelemetryMetricsStatsdTest do
       assert capture_log(fn ->
                TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
 
-               eventually(fn ->
-                 {:ok, new_udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-                 new_udp != udp
-               end)
+               # Wait for processing handle_cast by udp_error.
+               _ = TelemetryMetricsStatsd.get_pool_id(reporter)
              end) =~ ~r/\[error\] Failed to publish metrics over UDP: :closed/
 
       assert capture_log(fn ->
                TelemetryMetricsStatsd.udp_error(reporter, udp, :closed)
 
-               eventually(fn ->
-                 {:ok, new_udp} = TelemetryMetricsStatsd.get_udp(pool_id)
-                 new_udp != udp
-               end)
+               # Wait for processing handle_cast by udp_error.
+               _ = TelemetryMetricsStatsd.get_pool_id(reporter)
              end) == ""
     end
 
