@@ -58,11 +58,11 @@ defmodule TelemetryMetricsStatsd.Formatter.Standard do
   end
 
   defp do_format_metric_tags([{_, nil} | tags]) do
-    [?., "nil" | format_metric_tags(tags)]
+    [?., "nil" | do_format_metric_tags(tags)]
   end
 
   defp do_format_metric_tags([{_, tag_value} | tags]) do
-    [?., to_string(tag_value) | format_metric_tags(tags)]
+    [?., to_string(tag_value) | do_format_metric_tags(tags)]
   end
 
   defp format_metric_value(%Metrics.Counter{}, _value), do: "1|c"

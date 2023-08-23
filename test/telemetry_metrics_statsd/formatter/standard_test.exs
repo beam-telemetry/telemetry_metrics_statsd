@@ -64,14 +64,14 @@ defmodule TelemetryMetricsStatsd.Formatter.StandardTest do
   test "nil tags are included in the formatted metric" do
     m = given_last_value("my.awesome.metric", tags: [:method, :status])
 
-    assert format(m, 131, method: nil, status: 200) ==
-             "my.awesome.metric.nil.200:131|g"
+    assert format(m, 131, method: "GET", status: nil) ==
+             "my.awesome.metric.GET.nil:131|g"
   end
 
   test "empty string tag values are dropped" do
     m = given_last_value("my.awesome.metric", tags: [:method, :status])
 
-    assert format(m, 131, method: "", status: 200) == ""
+    assert format(m, 131, method: "GET", status: "") == ""
   end
 
   test "tags passed as explicit argument are used for the formatted metric" do
