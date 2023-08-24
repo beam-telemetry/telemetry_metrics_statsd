@@ -328,7 +328,7 @@ defmodule TelemetryMetricsStatsdTest do
 
   describe "UDP error handling" do
     test "reporting a UDP error logs an error" do
-      reporter = start_reporter(metrics: [])
+      reporter = start_reporter(metrics: [], pool_size: 1)
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
       {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
 
@@ -343,7 +343,7 @@ defmodule TelemetryMetricsStatsdTest do
     end
 
     test "reporting a UDP error for the same socket multiple times generates only one log" do
-      reporter = start_reporter(metrics: [])
+      reporter = start_reporter(metrics: [], pool_size: 1)
       pool_id = TelemetryMetricsStatsd.get_pool_id(reporter)
       {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
 

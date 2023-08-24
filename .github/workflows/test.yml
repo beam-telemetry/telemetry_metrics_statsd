@@ -11,10 +11,10 @@ on:
 jobs:
   format:
     name: Check formatting
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - uses: erlef/setup-elixir@v1
+      - uses: erlef/setup-beam@v1
         with:
           otp-version: "24.0"
           elixir-version: "1.12.0"
@@ -29,16 +29,21 @@ jobs:
             deps-
       - run: mix deps.get
       - run: mix format --check-formatted
+
   test:
     name: Test on Elixir ${{ matrix.elixir }} (OTP ${{ matrix.otp }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     strategy:
+      fail-fast: false
       matrix:
-        otp: ["22.3", "24.0"]
-        elixir: ["1.10.4", "1.12.0"]
+        include:
+          - otp: 22.3
+            elixir: 1.10.4
+          - otp: 24.0
+            elixir: 1.12.0
     steps:
       - uses: actions/checkout@v2
-      - uses: erlef/setup-elixir@v1
+      - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{ matrix.otp }}
           elixir-version: ${{ matrix.elixir }}
@@ -65,14 +70,18 @@ jobs:
 
   dialyze:
     name: Dialyze on Elixir ${{ matrix.elixir }} (OTP ${{ matrix.otp }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     strategy:
+      fail-fast: false
       matrix:
-        otp: ["22.3", "24.0"]
-        elixir: ["1.10.4", "1.12.0"]
+        include:
+          - otp: 22.3
+            elixir: 1.10.4
+          - otp: 24.0
+            elixir: 1.12.0
     steps:
       - uses: actions/checkout@v2
-      - uses: erlef/setup-elixir@v1
+      - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{ matrix.otp }}
           elixir-version: ${{ matrix.elixir }}
