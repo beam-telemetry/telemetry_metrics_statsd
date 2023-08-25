@@ -42,7 +42,7 @@ defmodule TelemetryMetricsStatsd.MixProject do
       {:telemetry_metrics, "~> 0.6"},
       {:nimble_options, "~> 0.4 or ~> 1.0"},
       {:stream_data, "~> 0.4", only: :test},
-      {:dialyxir, "~> 0.5", only: :test, runtime: false},
+      {:dialyxir, "~> 1.3", only: :test, runtime: false},
       {:ex_doc, "~> 0.19", only: :docs},
       {:liveness, "~> 1.0", only: :test},
       {:mock, "~> 0.3.5", only: :test}
