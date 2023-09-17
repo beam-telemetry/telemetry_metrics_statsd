@@ -6,7 +6,7 @@ defmodule TelemetryMetricsStatsd.Options do
       type: {:list, :any},
       required: true,
       doc:
-        "A lits of `Telemetry.Metrics` metric definitions that will be published by the reporter."
+        "A list of `Telemetry.Metrics` metric definitions that will be published by the reporter."
     ],
     host: [
       type: {:custom, __MODULE__, :host, []},
@@ -41,7 +41,7 @@ defmodule TelemetryMetricsStatsd.Options do
       default: [],
       doc:
         "Additional tags published with every metric. " <>
-          "Global tags are overriden by the tags specified in the metric definition."
+          "Global tags are overridden by the tags specified in the metric definition."
     ],
     prefix: [
       type: {:or, [:string, :atom]},

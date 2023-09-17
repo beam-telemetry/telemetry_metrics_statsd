@@ -244,7 +244,7 @@ defmodule TelemetryMetricsStatsd do
 
   The summary metric is reported as [DataDog
   histogram](https://docs.datadoghq.com/developers/metrics/types/?tab=histogram), as that is the
-  metric that provides a set of statistics about gathered measurments on the DataDog side.
+  metric that provides a set of statistics about gathered measurements on the DataDog side.
 
   The distribution is flushed as [DataDog
   distribution](https://docs.datadoghq.com/developers/metrics/types/?tab=distribution) metric, which
