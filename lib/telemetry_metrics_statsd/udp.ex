@@ -11,22 +11,21 @@ defmodule TelemetryMetricsStatsd.UDP do
 
   @type config :: %{
           :host => :inet.hostname() | :inet.ip_address() | :inet.local_address(),
-          optional(:port) => :inet.port_number()
+          optional(:port) => :inet.port_number(),
+          optional(:inet_address_family) => boolean()
         }
 
   @spec open(config()) ::
           {:ok, t()} | {:error, reason :: term()}
   def open(config) do
-    opts = [active: false]
+    opts = [{:active, false}]
 
     opts =
-      case config.host do
-        {:local, _} ->
-          [:local | opts]
-
-        _ ->
-          opts
-      end
+      Enum.reduce(config, opts, fn
+        {:host, {:local, _}}, opts -> [:local | opts]
+        {:inet_address_family, value}, opts -> [value | opts]
+        {_key, _value}, opts -> opts
+      end)
 
     case :gen_udp.open(0, opts) do
       {:ok, socket} ->
