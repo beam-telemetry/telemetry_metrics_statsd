@@ -4,7 +4,21 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.3](https://github.com/beam-telemetry/telemetry_metrics_statsd/tree/v0.6.2)
+## [0.7.0](https://github.com/beam-telemetry/telemetry_metrics_statsd/tree/v0.7.0)
+
+The major addition in this release is support for IPv6 StatsD hosts.
+
+#### Added
+
+- Support sending metrics to IPv6 hosts. (#79) @cheerfulstoic
+- Support OTP 26 and 25 and Elixir 1.14 and 1.15. (#83) @mopp
+
+#### Fixed
+
+- Remove deprecation warnings for `Logger.warn`. (#80) @whatyouhide
+- Don't emit metrics with empty string tag when standard formatter is used. (#86)
+
+## [0.6.3](https://github.com/beam-telemetry/telemetry_metrics_statsd/tree/v0.6.3)
 
 #### Added
 
