@@ -144,7 +144,6 @@ defmodule TelemetryMetricsStatsdTest do
              "invalid value for :formatter option: expected :formatter be either :standard or :datadog, got :my_formatter"
   end
 
-
   test "it doesn't crash when tag values are missing with standard formatter" do
     {socket, port} = given_udp_port_opened()
 
@@ -152,7 +151,7 @@ defmodule TelemetryMetricsStatsdTest do
 
     start_reporter(
       metrics: [counter],
-      port: port,
+      port: port
     )
 
     handlers_before = :telemetry.list_handlers([])
@@ -164,7 +163,6 @@ defmodule TelemetryMetricsStatsdTest do
     assert handlers_after == handlers_before
   end
 
-
   test "it doesn't crash when tag values are nil with standard formatter" do
     {socket, port} = given_udp_port_opened()
 
@@ -172,7 +170,7 @@ defmodule TelemetryMetricsStatsdTest do
 
     start_reporter(
       metrics: [counter],
-      port: port,
+      port: port
     )
 
     handlers_before = :telemetry.list_handlers([])
