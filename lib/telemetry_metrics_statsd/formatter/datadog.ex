@@ -62,6 +62,14 @@ defmodule TelemetryMetricsStatsd.Formatter.Datadog do
     [:erlang.atom_to_binary(k, :utf8), ?:, "nil"]
   end
 
+  # creates new list with {k, v} of the tail
+  # head through format tag to avoid extra commas
+  # and then combine_tags with the new list
+  defp format_tag(k, [head | tail] = v) when is_list(v) do
+    tags = Enum.map(tail, fn item -> {k, item} end)
+    [format_tag(k, head), combine_tags(tags)]
+  end
+
   defp format_tag(k, v) do
     [:erlang.atom_to_binary(k, :utf8), ?:, to_string(v)]
   end
