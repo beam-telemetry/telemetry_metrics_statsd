@@ -419,31 +419,36 @@ defmodule TelemetryMetricsStatsd do
     Process.flag(:trap_exit, true)
     metrics = Map.fetch!(options, :metrics)
 
-    udp_config =
+    {initialized_properly, udp_config} =
       case options.host do
-        {:local, _} = host -> %{host: host}
+        {:local, _} = host -> {true, %{host: host}}
         _ -> configure_host_resolution(options)
       end
 
-    udps =
-      for _ <- 1..options.pool_size do
-        {:ok, udp} = UDP.open(udp_config)
-        {:udp, udp}
-      end
-
     pool_id = :ets.new(__MODULE__, [:bag, :protected, read_concurrency: true])
-    :ets.insert(pool_id, udps)
 
     handler_ids =
-      EventHandler.attach(
-        metrics,
-        self(),
-        pool_id,
-        options.mtu,
-        options.prefix,
-        options.formatter,
-        options.global_tags
-      )
+      if initialized_properly do
+        udps =
+          for _ <- 1..options.pool_size do
+            {:ok, udp} = UDP.open(udp_config)
+            {:udp, udp}
+          end
+
+        :ets.insert(pool_id, udps)
+
+        EventHandler.attach(
+          metrics,
+          self(),
+          pool_id,
+          options.mtu,
+          options.prefix,
+          options.formatter,
+          options.global_tags
+        )
+      else
+        []
+      end
 
     {:ok,
      %{
@@ -452,7 +457,8 @@ defmodule TelemetryMetricsStatsd do
        pool_id: pool_id,
        host: options.host,
        port: options.port,
-       host_resolution_interval: options.host_resolution_interval
+       host_resolution_interval: options.host_resolution_interval,
+       initialized_properly: initialized_properly
      }}
   end
 
@@ -492,28 +498,40 @@ defmodule TelemetryMetricsStatsd do
 
   @impl true
   def handle_info(:resolve_host, state) do
-    %{host: host, udp_config: %{host: current_address}, host_resolution_interval: interval} =
+    %{
+      host: host,
+      udp_config: udp_config,
+      host_resolution_interval: interval,
+      initialized_properly: initialized_properly
+    } =
       state
 
     new_state =
       case :inet.gethostbyname(host) do
         {:ok, hostent(h_addr_list: ips)} ->
-          if Enum.member?(ips, current_address) do
-            state
-          else
-            [new_address | _] = ips
-            update_host(state, new_address)
+          cond do
+            !initialized_properly ->
+              [ip_address | _] = ips
+              Logger.debug("Resolved host #{host} to #{:inet.ntoa(ip_address)} IP address.")
+              update_host(state, ip_address)
+
+            Enum.member?(ips, udp_config.host) ->
+              state
           end
 
         {:error, reason} ->
-          Logger.log(
-            @log_level_warning,
-            "Failed to resolve the hostname #{host}: #{inspect(reason)}. " <>
-              "Using the previously resolved address of #{:inet.ntoa(current_address)}."
-          )
-      end
+          if(!initialized_properly) do
+            Logger.log(
+              @log_level_warning,
+              "Failed to resolve the hostname #{host}: #{inspect(reason)}. " <>
+                "Previously resolved hostname was unsuccessful. The library will not send any metrics. " <>
+                "Retrying to resolve it again in #{interval} milliseconds."
+            )
+          end
 
-    Process.send_after(self(), :resolve_host, interval)
+          Process.send_after(self(), :resolve_host, interval)
+          state
+      end
 
     {:noreply, new_state}
   end
@@ -538,7 +556,7 @@ defmodule TelemetryMetricsStatsd do
          inet_address_family: inet_address_family
        })
        when is_tuple(host) do
-    %{host: host, port: port, inet_address_family: inet_address_family}
+    {true, %{host: host, port: port, inet_address_family: inet_address_family}}
   end
 
   defp configure_host_resolution(%{
@@ -548,9 +566,20 @@ defmodule TelemetryMetricsStatsd do
          host_resolution_interval: interval
        })
        when is_integer(interval) do
-    {:ok, hostent(h_addr_list: [ip | _ips])} = :inet.gethostbyname(host, inet_address_family)
-    Process.send_after(self(), :resolve_host, interval)
-    %{host: ip, port: port, inet_address_family: inet_address_family}
+    case :inet.gethostbyname(host, inet_address_family) do
+      {:ok, hostent(h_addr_list: [ip | _ips])} ->
+        {true, %{host: ip, port: port, inet_address_family: inet_address_family}}
+
+      {:error, reason} ->
+        Logger.log(
+          @log_level_warning,
+          "Failed to resolve the hostname #{host}: #{inspect(reason)}. " <>
+            "Retrying to resolve it again in #{interval} milliseconds."
+        )
+
+        Process.send_after(self(), :resolve_host, interval)
+        {false, %{host: nil, port: port, inet_address_family: inet_address_family}}
+    end
   end
 
   defp configure_host_resolution(%{
@@ -558,8 +587,18 @@ defmodule TelemetryMetricsStatsd do
          port: port,
          inet_address_family: inet_address_family
        }) do
-    {:ok, hostent(h_addr_list: [ip | _ips])} = :inet.gethostbyname(host, inet_address_family)
-    %{host: ip, port: port, inet_address_family: inet_address_family}
+    case :inet.gethostbyname(host, inet_address_family) do
+      {:ok, hostent(h_addr_list: [ip | _ips])} ->
+        {true, %{host: ip, port: port, inet_address_family: inet_address_family}}
+
+      {:error, reason} ->
+        Logger.log(
+          @log_level_warning,
+          "Failed to resolve the hostname #{host}: #{inspect(reason)}. Metrics will not be sent at all."
+        )
+
+        {false, %{host: nil, port: port, inet_address_family: inet_address_family}}
+    end
   end
 
   defp update_pool(pool_id, new_host, new_port) do
