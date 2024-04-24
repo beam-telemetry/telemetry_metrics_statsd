@@ -547,7 +547,7 @@ defmodule TelemetryMetricsStatsd do
     %{pool_id: pool_id, udp_config: %{port: port} = udp_config} = state
     update_pool(pool_id, new_address, port)
 
-    %{state | udp_config: %{udp_config | host: new_address}}
+    %{state | udp_config: %{udp_config | host: new_address}, initialized_properly: true}
   end
 
   defp configure_host_resolution(%{
