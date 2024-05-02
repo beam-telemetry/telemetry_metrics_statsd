@@ -25,7 +25,7 @@ defmodule TelemetryMetricsStatsd.Packet do
 
     if binary_size > max_size do
       # TODO: this should be probably handled in a nicer way
-      raise "Binary size exceeds the provided maximum packet size. You might increase it via the :mtu config."
+      raise "Binary size #{binary_size} exceeds the provided maximum packet size #{max_size}. You might increase it via the :mtu config."
     end
 
     new_packet_binaries_count = packet_binaries_count + 1
