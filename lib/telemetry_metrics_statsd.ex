@@ -511,6 +511,8 @@ defmodule TelemetryMetricsStatsd do
             "Failed to resolve the hostname #{host}: #{inspect(reason)}. " <>
               "Using the previously resolved address of #{:inet.ntoa(current_address)}."
           )
+
+          state
       end
 
     Process.send_after(self(), :resolve_host, interval)
