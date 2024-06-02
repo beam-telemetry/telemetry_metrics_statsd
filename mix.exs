@@ -39,7 +39,7 @@ defmodule TelemetryMetricsStatsd.MixProject do
   defp deps do
     [
       {:telemetry, "~> 0.4 or ~> 1.0"},
-      {:telemetry_metrics, "~> 0.6"},
+      {:telemetry_metrics, "~> 1.0"},
       {:nimble_options, "~> 0.4 or ~> 1.0"},
       {:stream_data, "~> 0.4", only: :test},
       {:dialyxir, "~> 1.3", only: :test, runtime: false},
