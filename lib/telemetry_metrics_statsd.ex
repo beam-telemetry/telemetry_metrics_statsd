@@ -462,7 +462,7 @@ defmodule TelemetryMetricsStatsd do
     old_entry = {:udp, old_udp}
 
     if Enum.find(udps, fn entry -> entry == old_entry end) do
-      Logger.error("Failed to publish metrics over UDP: #{inspect(reason)}")
+      maybe_log_failure(reason)
       UDP.close(old_udp)
       :ets.delete_object(pool_id, old_entry)
 
@@ -524,6 +524,15 @@ defmodule TelemetryMetricsStatsd do
 
     :ok
   end
+
+  # These functions are being added to quiet unimportant errors that we do not actually care about
+  # These errors are drawn from the Posix Error system and we need to refer to
+  # https://www.man7.org/linux/man-pages/man3/errno.3.html
+  #
+  # EAGAIN just means that the resource we tried to send to was unavailable temporarily. There's no action needed to
+  # resolve this and it makes up the vast majority of our error logs from this module
+  defp maybe_log_failure(:eagain), do: :ok
+  defp maybe_log_failure(error), do: Logger.error("Failed to publish metrics over UDP: #{inspect(reason)}")
 
   defp update_host(state, new_address) do
     %{pool_id: pool_id, udp_config: %{port: port} = udp_config} = state
