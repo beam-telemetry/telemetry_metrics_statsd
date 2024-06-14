@@ -532,7 +532,7 @@ defmodule TelemetryMetricsStatsd do
   # EAGAIN just means that the resource we tried to send to was unavailable temporarily. There's no action needed to
   # resolve this and it makes up the vast majority of our error logs from this module
   defp maybe_log_failure(:eagain), do: :ok
-  defp maybe_log_failure(error), do: Logger.error("Failed to publish metrics over UDP: #{inspect(reason)}")
+  defp maybe_log_failure(reason), do: Logger.error("Failed to publish metrics over UDP: #{inspect(reason)}")
 
   defp update_host(state, new_address) do
     %{pool_id: pool_id, udp_config: %{port: port} = udp_config} = state
