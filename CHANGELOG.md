@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1](https://github.com/beam-telemetry/telemetry_metrics_statsd/tree/v0.7.1)
+
+#### Added
+
+- Support `TelemetryMetrics` version 1.0. (#96)
+- Log the binary size when the message exceeds the configured MTU. (#95)
+
+#### Fixed
+
+- Fix the reporter crash when the host resolution fails. (#96)
+
 ## [0.7.0](https://github.com/beam-telemetry/telemetry_metrics_statsd/tree/v0.7.0)
 
 The major addition in this release is support for IPv6 StatsD hosts.
