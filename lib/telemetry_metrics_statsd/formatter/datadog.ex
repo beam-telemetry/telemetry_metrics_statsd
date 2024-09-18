@@ -8,7 +8,22 @@ defmodule TelemetryMetricsStatsd.Formatter.Datadog do
   require Logger
 
   @impl true
-  def format(metric, value, tags) do
+  def format(%Metrics.LastValue{reporter_options: reporter_options} = metric, value, tags) do
+    case Keyword.get(reporter_options, :report_as) do
+      :service_check -> [
+        "_sc|",
+        format_metric_name(metric.name),
+        ?|,
+        format_number(value),
+        format_metric_tags(tags)
+      ]
+      _ -> _format(metric, value, tags)
+    end
+  end
+
+  def format(metric, value, tags), do: _format(metric, value, tags)
+
+  defp _format(metric, value, tags) do
     [
       format_metric_name(metric.name),
       ?:,
@@ -33,10 +48,20 @@ defmodule TelemetryMetricsStatsd.Formatter.Datadog do
   defp format_metric_value(%Metrics.Distribution{}, value),
     do: [format_number(value), "|d"]
 
-  defp format_metric_value(%Metrics.LastValue{}, value),
-    do: [format_number(value), "|g"]
+  defp format_metric_value(%Metrics.LastValue{reporter_options: reporter_options} = last_value, value) do
+    case Keyword.get(reporter_options, :report_as) do
+      :service_check -> format_service_check_value(last_value, value)
+      _ -> format_last_value_metric_value(last_value, value)
+    end
+  end
 
   defp format_metric_value(%Metrics.Sum{}, value), do: [format_number(value), "|c"]
+
+  defp format_service_check_value(%Metrics.LastValue{}, value),
+    do: [format_number(value)]
+
+  defp format_last_value_metric_value(%Metrics.LastValue{}, value),
+    do: [format_number(value), "|g"]
 
   defp format_number(number) when is_integer(number) do
     :erlang.integer_to_binary(number)
