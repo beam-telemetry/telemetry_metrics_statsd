@@ -146,6 +146,23 @@ defmodule TelemetryMetricsStatsd do
 
       "vm.memory.total:1024|g"
 
+  When the `report_as: :service_check` reporter option is passed in conjunction with the `datadog`
+  reporter, the last value metric is reported as a service check. Datadog only supports the following
+  values: 0 - OK, 1 - Warn, 2 - Critical, 3 - Unknown. Additionally the "host" and "message"
+  properties are not supported, as telemetry_metrics doesn't have a way to express them.
+
+  Given the metric definition
+
+      last_value("my_service.fragile_cache.status", reporter_options: [report_as: :service_check])
+
+  and the event
+
+      :telemetry.execute([:my_service, :fragile_cache], %{status: 1})
+
+  the following would be sent to StatsD
+
+      "_sc|my_service.fragile_cache.status|1"
+
   #### Sum
 
   Sum metric is also represented as a gauge - the difference is that it always changes relatively
