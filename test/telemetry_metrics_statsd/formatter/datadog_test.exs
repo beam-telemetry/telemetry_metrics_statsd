@@ -91,6 +91,34 @@ defmodule TelemetryMetricsStatsd.Formatter.DatadogTest do
     assert format(m, 131.4, []) == "my.awesome.metric:131.4|g"
   end
 
+  test "tag values passed as list are included in the formatted metric as multiple tags" do
+    m = given_last_value("my.awesome.metric", tags: [:method, :item, :status])
+
+    assert format(m, 131, method: "GET", item: ["a", "b", "c"], status: 200) ==
+             "my.awesome.metric:131|g|#method:GET,item:a,item:b,item:c,status:200"
+  end
+
+  test "tag values passed as list with one item are included in the formatted metric" do
+    m = given_last_value("my.awesome.metric", tags: [:method, :item, :status])
+
+    assert format(m, 131, method: "GET", item: ["a"], status: 200) ==
+             "my.awesome.metric:131|g|#method:GET,item:a,status:200"
+  end
+
+  test "tag values passed as list are included in the formatted metric as multiple tags, when missing tag values" do
+    m = given_last_value("my.awesome.metric", tags: [:method, :item, :status])
+
+    assert format(m, 131, item: ["a", "b", "c"], status: 200) ==
+             "my.awesome.metric:131|g|#item:a,item:b,item:c,status:200"
+  end
+
+  test "tag values passed as list with one item are included in the formatted metric, when missing tag values" do
+    m = given_last_value("my.awesome.metric", tags: [:method, :item, :status])
+
+    assert format(m, 131, item: ["a"], status: 200) ==
+             "my.awesome.metric:131|g|#item:a,status:200"
+  end
+
   defp format(metric, value, tags) do
     Datadog.format(metric, value, tags)
     |> :erlang.iolist_to_binary()
