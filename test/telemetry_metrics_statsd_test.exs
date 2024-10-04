@@ -157,7 +157,8 @@ defmodule TelemetryMetricsStatsdTest do
     handlers_before = :telemetry.list_handlers([])
 
     :telemetry.execute([:http, :request], %{latency: 172}, %{method: "GET"})
-    assert_reported(socket, "")
+
+    assert_reported(socket, "http.request.count.GET:1|c")
 
     handlers_after = :telemetry.list_handlers([])
     assert handlers_after == handlers_before
@@ -196,7 +197,7 @@ defmodule TelemetryMetricsStatsdTest do
     handlers_before = :telemetry.list_handlers([])
 
     :telemetry.execute([:http, :request], %{latency: 172}, %{method: "GET"})
-    assert_reported(socket, "http.request.count:1|c|#method:GET,status:")
+    assert_reported(socket, "http.request.count:1|c|#method:GET")
 
     handlers_after = :telemetry.list_handlers([])
     assert handlers_after == handlers_before
