@@ -317,7 +317,7 @@ defmodule TelemetryMetricsStatsd do
   require Record
 
   alias Telemetry.Metrics
-  alias TelemetryMetricsStatsd.{EventHandler, Options, UDP}
+  alias TelemetryMetricsStatsd.{EventHandler, Options, UDP, CounterOk, CounterError}
 
   @type prefix :: String.t() | atom() | nil
   @type host :: String.t() | :inet.ip_address()
@@ -402,6 +402,17 @@ defmodule TelemetryMetricsStatsd do
     end
   end
 
+  def get_udp_worker(pool_id) do
+    case :ets.lookup(pool_id, :udp_worker) do
+      [] ->
+        :error
+
+      udp_workers ->
+        {:udp_worker, udp_worker} = Enum.random(udp_workers)
+        {:ok, udp_worker}
+    end
+  end
+
   @doc false
   @spec get_pool_id(pid()) :: :ets.tid()
   def get_pool_id(reporter) do
@@ -417,6 +428,10 @@ defmodule TelemetryMetricsStatsd do
   @impl true
   def init(options) do
     Process.flag(:trap_exit, true)
+
+    CounterOk.init()
+    CounterError.init()
+
     metrics = Map.fetch!(options, :metrics)
 
     udp_config =
@@ -432,7 +447,22 @@ defmodule TelemetryMetricsStatsd do
       end
 
     pool_id = :ets.new(__MODULE__, [:bag, :protected, read_concurrency: true])
+
+    udp_workers =
+      for _ <- 1..options.pool_size do
+        {:ok, worker_pid} =
+          TelemetryMetricsStatsd.UDPWorker.start_link(
+            reporter: self(),
+            pool_id: pool_id,
+            max_datagram_size: options.mtu,
+            buffer_flush_ms: options.buffer_flush_ms
+          )
+
+        {:udp_worker, worker_pid}
+      end
+
     :ets.insert(pool_id, udps)
+    :ets.insert(pool_id, udp_workers)
 
     handler_ids =
       EventHandler.attach(
@@ -445,6 +475,8 @@ defmodule TelemetryMetricsStatsd do
         options.global_tags
       )
 
+    schedule_metrics_report(options.diagnostic_metrics_report_interval)
+
     {:ok,
      %{
        udp_config: udp_config,
@@ -452,7 +484,8 @@ defmodule TelemetryMetricsStatsd do
        pool_id: pool_id,
        host: options.host,
        port: options.port,
-       host_resolution_interval: options.host_resolution_interval
+       host_resolution_interval: options.host_resolution_interval,
+       diagnostic_metrics_report_interval: options.diagnostic_metrics_report_interval
      }}
   end
 
@@ -481,8 +514,34 @@ defmodule TelemetryMetricsStatsd do
   end
 
   @impl true
+  def handle_cast(:close, %{pool_id: pool_id} = state) do
+    pool_id
+    |> :ets.tab2list()
+    |> Enum.each(fn item ->
+      case item do
+        {:udp, udp} ->
+          :ets.delete_object(pool_id, {:udp, udp})
+          UDP.close(udp)
+          :ets.insert(pool_id, {:udp, udp})
+
+        _ ->
+          :ok
+      end
+    end)
+
+    {:noreply, state}
+  end
+
+  @impl true
   def handle_call(:get_pool_id, _from, %{pool_id: pool_id} = state) do
     {:reply, pool_id, state}
+  end
+
+  defp message_queue_len(target) when is_pid(target) do
+    case Process.info(target, :message_queue_len) do
+      {:message_queue_len, len} -> len
+      _ -> nil
+    end
   end
 
   @impl true
@@ -518,6 +577,40 @@ defmodule TelemetryMetricsStatsd do
     Process.send_after(self(), :resolve_host, interval)
 
     {:noreply, new_state}
+  end
+
+  @impl true
+  def handle_info(:report_metrics, state) do
+    :telemetry.execute(
+      [:telemetry_metrics_statsd, :udp_metrics],
+      %{
+        ok_count: CounterOk.get(),
+        error_count: CounterError.get()
+      },
+      %{}
+    )
+
+    state.pool_id
+    |> :ets.tab2list()
+    |> Enum.each(fn item ->
+      case item do
+        {:udp_worker, udp_worker} ->
+          :telemetry.execute(
+            [:telemetry_metrics_statsd, :udp_worker_metrics],
+            %{
+              message_queue_len: message_queue_len(udp_worker),
+            },
+            %{}
+          )
+
+        _ ->
+          :ok
+      end
+    end)
+
+    schedule_metrics_report(state.diagnostic_metrics_report_interval)
+
+    {:noreply, state}
   end
 
   @impl true
@@ -567,10 +660,24 @@ defmodule TelemetryMetricsStatsd do
   defp update_pool(pool_id, new_host, new_port) do
     pool_id
     |> :ets.tab2list()
-    |> Enum.each(fn {:udp, udp} ->
-      :ets.delete_object(pool_id, {:udp, udp})
-      updated_udp = UDP.update(udp, new_host, new_port)
-      :ets.insert(pool_id, {:udp, updated_udp})
+    |> Enum.each(fn item ->
+      case item do
+        {:udp, udp} ->
+          :ets.delete_object(pool_id, {:udp, udp})
+          updated_udp = UDP.update(udp, new_host, new_port)
+          :ets.insert(pool_id, {:udp, updated_udp})
+
+        _ ->
+          :ok
+      end
     end)
   end
+
+  # closes udp sockets, currently used only for testing purpose
+  def close(pid) do
+    GenServer.cast(pid, :close)
+  end
+
+  defp schedule_metrics_report(interval_ms) when is_integer(interval_ms),
+    do: Process.send_after(self(), :report_metrics, interval_ms)
 end

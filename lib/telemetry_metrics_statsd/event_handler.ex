@@ -2,7 +2,9 @@ defmodule TelemetryMetricsStatsd.EventHandler do
   @moduledoc false
 
   alias Telemetry.Metrics
-  alias TelemetryMetricsStatsd.{Formatter, Packet, UDP}
+  alias TelemetryMetricsStatsd.{Formatter}
+
+  require Logger
 
   @spec attach(
           [Metrics.t()],
@@ -46,10 +48,8 @@ defmodule TelemetryMetricsStatsd.EventHandler do
   end
 
   def handle_event(_event, measurements, metadata, %{
-        reporter: reporter,
         pool_id: pool_id,
         metrics: metrics,
-        mtu: mtu,
         prefix: prefix,
         formatter: formatter_mod,
         global_tags: global_tags
@@ -79,7 +79,7 @@ defmodule TelemetryMetricsStatsd.EventHandler do
         :ok
 
       packets ->
-        publish_metrics(reporter, pool_id, Packet.build_packets(packets, mtu, "\n"))
+        schedule_metrics_publish(pool_id, packets)
     end
   end
 
@@ -128,22 +128,14 @@ defmodule TelemetryMetricsStatsd.EventHandler do
     end
   end
 
-  @spec publish_metrics(pid(), :ets.tid(), [binary()]) :: :ok
-  defp publish_metrics(reporter, pool_id, packets) do
-    case TelemetryMetricsStatsd.get_udp(pool_id) do
-      {:ok, udp} ->
-        Enum.reduce_while(packets, :cont, fn packet, :cont ->
-          case UDP.send(udp, packet) do
-            :ok ->
-              {:cont, :cont}
-
-            {:error, reason} ->
-              TelemetryMetricsStatsd.udp_error(reporter, udp, reason)
-              {:halt, :halt}
-          end
-        end)
+  defp schedule_metrics_publish(pool_id, packets) do
+    case TelemetryMetricsStatsd.get_udp_worker(pool_id) do
+      {:ok, udp_worker_pid} ->
+        TelemetryMetricsStatsd.UDPWorker.publish_datagrams(udp_worker_pid, packets)
 
       :error ->
+        Logger.error("Failed to schedule metrics publishing over UDP: no workers available.")
+
         :ok
     end
   end

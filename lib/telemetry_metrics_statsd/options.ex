@@ -61,10 +61,24 @@ defmodule TelemetryMetricsStatsd.Options do
     ],
     mtu: [
       type: :non_neg_integer,
-      default: 512,
+      # https://github.com/DataDog/datadog-go/blob/3255e6186e83fad1e447573c9fa03dd13c023394/statsd/statsd.go#L35-L41
+      # usually IPv4 networks are configured with a MTU of 1500 bytes, so packet size should <= MTU
+      default: 1432,
       doc:
         "Maximum Transmission Unit of the link between your application and the StastD server in bytes. " <>
           "If this value is greater than the actual MTU of the link, UDP packets with published metrics will be dropped."
+    ],
+    buffer_flush_ms: [
+      type: :non_neg_integer,
+      default: 0,
+      doc:
+        "The maximum time in milliseconds to wait before flushing the buffer. If the buffer is not full, it will be flushed after this time."
+    ],
+    diagnostic_metrics_report_interval: [
+      type: :non_neg_integer,
+      # every 15 seconds
+      default: 15_000,
+      doc: "The interval in milliseconds when diagnostic metrics are published"
     ]
   ]
 

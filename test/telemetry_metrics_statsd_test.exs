@@ -6,6 +6,18 @@ defmodule TelemetryMetricsStatsdTest do
   import Liveness
   import Mock
 
+  alias TelemetryMetricsStatsd.{CounterOk, CounterError}
+  alias TelemetryMetricsStatsd.Test.Helpers
+
+  setup do
+    on_exit(fn ->
+      CounterOk.reset()
+      CounterError.reset()
+    end)
+
+    :ok
+  end
+
   test "counter metric is reported as StatsD counter with 1 as a value" do
     {socket, port} = given_udp_port_opened()
     counter = given_counter("http.requests", event_name: "http.request")
@@ -741,6 +753,108 @@ defmodule TelemetryMetricsStatsdTest do
         {:ok, udp} = TelemetryMetricsStatsd.get_udp(pool_id)
         assert udp.host == {127, 0, 0, 1}
       end)
+    end
+
+    test "buffers packets when buffer_flush_ms is non-zero" do
+      {socket, port} = given_udp_port_opened()
+      counter = given_counter("http.requests", event_name: "http.request")
+
+      start_reporter(metrics: [counter], port: port, buffer_flush_ms: 10, pool_size: 1)
+
+      :telemetry.execute([:http, :request], %{latency: 211})
+      :telemetry.execute([:http, :request], %{latency: 200})
+      :telemetry.execute([:http, :request], %{latency: 198})
+
+      assert_reported(socket, "http.requests:1|c\nhttp.requests:1|c\nhttp.requests:1|c\n")
+    end
+
+    test "splits packets into multiple ones when number exceeds mtu" do
+      {socket, port} = given_udp_port_opened()
+      counter = given_counter("http.requests", event_name: "http.request")
+      counter2 = given_counter("db.query", event_name: "db.query")
+
+      start_reporter(
+        metrics: [counter, counter2],
+        port: port,
+        buffer_flush_ms: 10,
+        pool_size: 1,
+        mtu: 17
+      )
+
+      :telemetry.execute([:http, :request], %{latency: 211})
+      :telemetry.execute([:db, :query], %{latency: 211})
+
+      eventually(fn ->
+        assert CounterOk.get() == 2
+      end)
+
+      assert_reported(socket, "http.requests:1|c")
+      assert_reported(socket, "db.query:1|c")
+    end
+
+    test "counts udp ok packets" do
+      {socket, port} = given_udp_port_opened()
+      counter = given_counter("http.requests", event_name: "http.request")
+
+      start_reporter(metrics: [counter], port: port, buffer_flush_ms: 10, pool_size: 1)
+
+      :telemetry.execute([:http, :request], %{latency: 211})
+      :telemetry.execute([:http, :request], %{latency: 200})
+      :telemetry.execute([:http, :request], %{latency: 198})
+
+      assert_reported(socket, "http.requests:1|c\nhttp.requests:1|c\nhttp.requests:1|c\n")
+
+      assert CounterOk.get() == 1
+      assert CounterError.get() == 0
+    end
+
+    @tag :capture_log
+    test "counts udp error packets" do
+      {_socket, port} = given_udp_port_opened()
+      counter = given_counter("http.requests", event_name: "http.request")
+
+      reporter = start_reporter(port: port, metrics: [counter], buffer_flush_ms: 10, pool_size: 1)
+
+      # closes udp connections to simulate an error
+      TelemetryMetricsStatsd.close(reporter)
+
+      :telemetry.execute([:http, :request], %{latency: 211})
+
+      eventually(fn ->
+        assert CounterError.get() == 1
+      end)
+    end
+
+    @tag :only
+    test "sends diagnostic telemetry periodically" do
+      {socket, port} = given_udp_port_opened()
+      counter = given_counter("http.requests", event_name: "http.request")
+
+      Helpers.setup_telemetry(
+        [
+          [:telemetry_metrics_statsd, :udp_metrics],
+          [:telemetry_metrics_statsd, :udp_worker_metrics]
+        ],
+        pid: self()
+      )
+
+      start_reporter(
+        metrics: [counter],
+        port: port,
+        pool_size: 1,
+        buffer_flush_ms: 10,
+        diagnostic_metrics_report_interval: 50
+      )
+
+      :telemetry.execute([:http, :request], %{latency: 211})
+
+      assert_receive {:telemetry_event,
+                      {[:telemetry_metrics_statsd, :udp_metrics], %{ok_count: 1, error_count: 0},
+                       %{}, _}}
+
+      assert_receive {:telemetry_event,
+                      {[:telemetry_metrics_statsd, :udp_worker_metrics], %{message_queue_len: 0},
+                       %{}, _}}
     end
   end
 
