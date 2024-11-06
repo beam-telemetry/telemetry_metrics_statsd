@@ -786,6 +786,7 @@ defmodule TelemetryMetricsStatsdTest do
 
       eventually(fn ->
         assert CounterOk.get() == 2
+        assert CounterError.get() == 0
       end)
 
       assert_reported(socket, "http.requests:1|c")
@@ -821,6 +822,7 @@ defmodule TelemetryMetricsStatsdTest do
       :telemetry.execute([:http, :request], %{latency: 211})
 
       eventually(fn ->
+        assert CounterOk.get() == 0
         assert CounterError.get() == 1
       end)
     end
@@ -853,7 +855,7 @@ defmodule TelemetryMetricsStatsdTest do
                        %{}, _}}
 
       assert_receive {:telemetry_event,
-                      {[:telemetry_metrics_statsd, :udp_worker_metrics], %{message_queue_len: 0},
+                      {[:telemetry_metrics_statsd, :udp_metrics], %{message_queue_len: 0},
                        %{}, _}}
     end
   end

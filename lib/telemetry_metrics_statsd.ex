@@ -596,7 +596,7 @@ defmodule TelemetryMetricsStatsd do
       case item do
         {:udp_worker, udp_worker} ->
           :telemetry.execute(
-            [:telemetry_metrics_statsd, :udp_worker_metrics],
+            [:telemetry_metrics_statsd, :udp_metrics],
             %{
               message_queue_len: message_queue_len(udp_worker),
             },
@@ -611,6 +611,11 @@ defmodule TelemetryMetricsStatsd do
     schedule_metrics_report(state.diagnostic_metrics_report_interval)
 
     {:noreply, state}
+  rescue
+    _ ->
+      Logger.error("Failed to report diagnostic metrics")
+
+      {:noreply, state}
   end
 
   @impl true
