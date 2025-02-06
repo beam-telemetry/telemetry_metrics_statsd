@@ -42,7 +42,7 @@ defmodule TelemetryMetricsStatsd.UDP do
   end
 
   @spec update(t(), :inet.hostname() | :inet.ip_address(), :inet.port_number()) :: t()
-  def update(%__MODULE__{} = udp, new_host, new_port) do
+  def update(%__MODULE__{} = udp, _new_host, _new_port) do
     #%__MODULE__{udp | host: new_host, port: new_port}
     udp
   end
@@ -53,6 +53,11 @@ defmodule TelemetryMetricsStatsd.UDP do
   end
 
   defp handle_send_result({:error, :eagain}) do
+    # TODO: report packed drop?
+    :ok
+  end
+
+  defp handle_send_result({:error, :econnrefused}) do
     # TODO: report packed drop?
     :ok
   end
