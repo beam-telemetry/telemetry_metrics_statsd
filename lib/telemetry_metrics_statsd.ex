@@ -410,6 +410,10 @@ defmodule TelemetryMetricsStatsd do
 
   @doc false
   @spec udp_error(pid(), UDP.t(), reason :: term) :: :ok
+  def udp_error(_reporter, _udp, :eagain) do
+    :ok
+  end
+
   def udp_error(reporter, udp, reason) do
     GenServer.cast(reporter, {:udp_error, udp, reason})
   end
