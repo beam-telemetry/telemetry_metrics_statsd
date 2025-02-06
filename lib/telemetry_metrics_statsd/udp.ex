@@ -46,6 +46,7 @@ defmodule TelemetryMetricsStatsd.UDP do
       _ ->
         :gen_udp.send(socket, host, port, data)
     end
+    |> handle_send_result()
   end
 
   @spec update(t(), :inet.hostname() | :inet.ip_address(), :inet.port_number()) :: t()
@@ -56,5 +57,14 @@ defmodule TelemetryMetricsStatsd.UDP do
   @spec close(t()) :: :ok
   def close(%__MODULE__{socket: socket}) do
     :gen_udp.close(socket)
+  end
+
+  defp handle_send_result({:error, :eagain}) do
+    # TODO: report packed drop?
+    :ok
+  end
+
+  defp handle_send_result(result) do
+    result
   end
 end
