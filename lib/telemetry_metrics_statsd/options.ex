@@ -65,6 +65,22 @@ defmodule TelemetryMetricsStatsd.Options do
       doc:
         "Maximum Transmission Unit of the link between your application and the StastD server in bytes. " <>
           "If this value is greater than the actual MTU of the link, UDP packets with published metrics will be dropped."
+    ],
+    emitter_pool: [
+      type: {:or, [:atom, :pos_integer]},
+      default: :disabled,
+      doc:
+        "Whether or not to use an emitter pool.  When the emitter pool is disabled, metric emits will happen in the " <>
+          "calling process.  When the emitter pool is enabled, a pool of emitter processes will be used to emit the " <>
+          "metrics.  Default is disabled."
+    ],
+    emitter_drop_threshold: [
+      type: {:or, [:atom, :pos_integer]},
+      default: :disabled,
+      doc:
+        "When using an emitter pool, the drop threshold defines how large the emitter's message queue can become " <>
+          "before the emitter will begin dropping metrics.  By default this is disabled, note that when disabled " <>
+          "since emitting processes have no backpressure there is a higher risk of OOM."
     ]
   ]
 

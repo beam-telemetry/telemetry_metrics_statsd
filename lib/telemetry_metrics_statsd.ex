@@ -314,10 +314,11 @@ defmodule TelemetryMetricsStatsd do
   use GenServer
 
   require Logger
-  require Record
 
   alias Telemetry.Metrics
-  alias TelemetryMetricsStatsd.{EventHandler, Options, UDP}
+  alias TelemetryMetricsStatsd.{EventHandler, Host, LogLevel, Options, UDP}
+
+  require Host
 
   @type prefix :: String.t() | atom() | nil
   @type host :: String.t() | :inet.ip_address()
@@ -331,13 +332,11 @@ defmodule TelemetryMetricsStatsd do
           | {:formatter, :standard | :datadog}
           | {:global_tags, Keyword.t()}
           | {:host_resolution_interval, non_neg_integer()}
+          | {:emitter_pool, :disabled | pos_integer()}
+          | {:emitter_drop_threshold, :disabled | pos_integer()}
   @type options :: [option]
 
-  Record.defrecordp(:hostent, Record.extract(:hostent, from_lib: "kernel/include/inet.hrl"))
 
-  # TODO: remove this when we depend on Elixir 1.11+, where Logger.warning/1
-  # was introduced.
-  @log_level_warning if macro_exported?(Logger, :warning, 1), do: :warning, else: :warn
 
   @doc """
   Reporter's child spec.
@@ -380,7 +379,13 @@ defmodule TelemetryMetricsStatsd do
   def start_link(options) do
     case Options.validate(options) do
       {:ok, options} ->
-        GenServer.start_link(__MODULE__, options)
+        case options.emitter_pool do
+          :disabled ->
+            GenServer.start_link(__MODULE__, options)
+
+          _ ->
+            TelemetryMetricsStatsd.EmitterPool.start_link(options)
+        end
 
       {:error, _} = err ->
         err
@@ -422,7 +427,7 @@ defmodule TelemetryMetricsStatsd do
     udp_config =
       case options.host do
         {:local, _} = host -> %{host: host}
-        _ -> configure_host_resolution(options)
+        _ -> Host.configure_host_resolution(options)
       end
 
     udps =
@@ -497,7 +502,7 @@ defmodule TelemetryMetricsStatsd do
 
     new_state =
       case :inet.gethostbyname(host) do
-        {:ok, hostent(h_addr_list: ips)} ->
+        {:ok, Host.hostent(h_addr_list: ips)} ->
           if Enum.member?(ips, current_address) do
             state
           else
@@ -507,7 +512,7 @@ defmodule TelemetryMetricsStatsd do
 
         {:error, reason} ->
           Logger.log(
-            @log_level_warning,
+            LogLevel.warning(),
             "Failed to resolve the hostname #{host}: #{inspect(reason)}. " <>
               "Using the previously resolved address of #{:inet.ntoa(current_address)}."
           )
@@ -515,7 +520,7 @@ defmodule TelemetryMetricsStatsd do
           state
       end
 
-    Process.send_after(self(), :resolve_host, interval)
+    Host.schedule_resolve(interval)
 
     {:noreply, new_state}
   end
@@ -532,36 +537,6 @@ defmodule TelemetryMetricsStatsd do
     update_pool(pool_id, new_address, port)
 
     %{state | udp_config: %{udp_config | host: new_address}}
-  end
-
-  defp configure_host_resolution(%{
-         host: host,
-         port: port,
-         inet_address_family: inet_address_family
-       })
-       when is_tuple(host) do
-    %{host: host, port: port, inet_address_family: inet_address_family}
-  end
-
-  defp configure_host_resolution(%{
-         host: host,
-         port: port,
-         inet_address_family: inet_address_family,
-         host_resolution_interval: interval
-       })
-       when is_integer(interval) do
-    {:ok, hostent(h_addr_list: [ip | _ips])} = :inet.gethostbyname(host, inet_address_family)
-    Process.send_after(self(), :resolve_host, interval)
-    %{host: ip, port: port, inet_address_family: inet_address_family}
-  end
-
-  defp configure_host_resolution(%{
-         host: host,
-         port: port,
-         inet_address_family: inet_address_family
-       }) do
-    {:ok, hostent(h_addr_list: [ip | _ips])} = :inet.gethostbyname(host, inet_address_family)
-    %{host: ip, port: port, inet_address_family: inet_address_family}
   end
 
   defp update_pool(pool_id, new_host, new_port) do
