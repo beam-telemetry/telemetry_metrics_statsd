@@ -1,12 +1,10 @@
 defmodule TelemetryMetricsStatsd.UDP do
   @moduledoc false
 
-  defstruct [:host, :port, :socket]
+  defstruct [:socket]
 
   @opaque t :: %__MODULE__{
-            host: :inet.hostname() | :inet.ip_address() | :inet.local_address(),
-            port: :inet.port_number(),
-            socket: :gen_udp.socket()
+            socket: :socket.socket()
           }
 
   @type config :: %{
@@ -18,45 +16,40 @@ defmodule TelemetryMetricsStatsd.UDP do
   @spec open(config()) ::
           {:ok, t()} | {:error, reason :: term()}
   def open(config) do
-    opts = [{:active, false}]
+    {domain, address} =
+      case config.host do
+        {:local, path} ->
+          {:local, %{family: :local, path: path}}
 
-    opts =
-      Enum.reduce(config, opts, fn
-        {:host, {:local, _}}, opts -> [:local | opts]
-        {:inet_address_family, value}, opts -> [value | opts]
-        {_key, _value}, opts -> opts
-      end)
+        ip when tuple_size(ip) == 4 ->
+          {:inet, %{family: :inet, port: config.port, addr: ip}}
 
-    case :gen_udp.open(0, opts) do
-      {:ok, socket} ->
-        udp = struct(__MODULE__, Map.put(config, :socket, socket))
-        {:ok, udp}
+        ip when tuple_size(ip) == 8 ->
+          {:inet, %{family: :inet6, port: config.port, addr: ip}}
+      end
 
-      {:error, _} = err ->
-        err
+    with {:ok, socket} <- :socket.open(domain, :dgram),
+         :ok <- :socket.connect(socket, address) do
+      udp = struct(__MODULE__, Map.put(config, :socket, socket))
+      {:ok, udp}
     end
   end
 
   @spec send(t(), iodata()) :: :ok | {:error, reason :: term()}
-  def send(%__MODULE__{host: host, port: port, socket: socket}, data) do
-    case host do
-      {:local, _} ->
-        :gen_udp.send(socket, host, 0, data)
-
-      _ ->
-        :gen_udp.send(socket, host, port, data)
-    end
+  def send(%__MODULE__{socket: socket}, data) do
+    :socket.send(socket, data)
     |> handle_send_result()
   end
 
   @spec update(t(), :inet.hostname() | :inet.ip_address(), :inet.port_number()) :: t()
   def update(%__MODULE__{} = udp, new_host, new_port) do
-    %__MODULE__{udp | host: new_host, port: new_port}
+    #%__MODULE__{udp | host: new_host, port: new_port}
+    udp
   end
 
   @spec close(t()) :: :ok
   def close(%__MODULE__{socket: socket}) do
-    :gen_udp.close(socket)
+    :socket.close(socket)
   end
 
   defp handle_send_result({:error, :eagain}) do

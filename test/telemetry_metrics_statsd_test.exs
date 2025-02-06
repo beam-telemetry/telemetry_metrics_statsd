@@ -431,7 +431,7 @@ defmodule TelemetryMetricsStatsdTest do
         new_udp != udp
       end)
 
-      assert :gen_udp.recv(udp.socket, 0) == {:error, :closed}
+      assert :socket.recv(udp.socket, 0) == {:error, :closed}
     end
   end
 
