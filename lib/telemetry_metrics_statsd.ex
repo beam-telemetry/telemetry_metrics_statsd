@@ -287,10 +287,10 @@ defmodule TelemetryMetricsStatsd do
 
   ## Maximum datagram size
 
-  Metrics are sent to StatsD over UDP, so it's important that the size of the datagram does not
+  By default, metrics are sent to StatsD over UDP, so it's important that the size of the datagram does not
   exceed the Maximum Transmission Unit, or MTU, of the link, so that no data is lost on the way.
   By default the reporter will break up the datagrams at 512 bytes, but this is configurable via
-  the `:mtu` option.
+  the `:mtu` option. Properly setting the MTU will have a drastic impact on performance.
 
   ## Sampling data
 
@@ -312,15 +312,86 @@ defmodule TelemetryMetricsStatsd do
 
   In this example, we are capturing 100% of the measurements for the counter, but only 10% for both
   summary and distribution.
-  """
 
-  use GenServer
+  ## Overload Protection
+
+  `TelemetryMetricsStatsd` can measure the amount of time metrics spend in the message queues of the processes
+  that emit them, and take corrective action if this time is too long. To enable this functionality,
+  set the `max_queue_dwell_time` when setting up your reporter
+
+      TelemetryMetricsStatsd.start_link(
+        metrics: [
+          ...
+        ],
+       # Take action if a probe message sits in the queue for 1000ms or longer
+       max_queue_dwell_time: 1000
+      )
+
+
+  If this key is set, a probe message is sent every second, and if this message takes longer than 100ms
+  to work its way through the queue, the emitter begins applying the additive increase multiplicative decrease
+  algorithm to reduce the number of metrics emitted by the system. Each time the system fails the dwell time
+  check, the number of metrics emitted is reduced by 50%. This happens until only 0.1% of the total metrics are
+  being emitted. When the percentage of metrics emitted is reduced, a `critical` Logger message is emitted, as
+  are the following metrics:
+
+     *  `"telemetry_metrics_statsd.congestion.emit_percentage.decrease.count"`
+
+     *  `"telemetry_metrics_statsd.congestion.emit_percentage.decrease.value"`
+
+  When the emit percentage is less than 100 and a dwell time probe succeeds, the emit percentage is increased by 1%. When
+  this happens, an `info` Logger message is logged, and the following metrics are emitted:
+
+     * `"telemetry_metrics_statsd.congestion.emit_percentage.increase.count"`
+
+     * `"telemetry_metrics_statsd.congestion.emit_percentage.increase.value"`
+
+  ## Complete Configuration
+
+  #{TelemetryMetricsStatsd.Options.docs()}
+
+
+  ## Performance
+
+  #### Baseline performance characteristics
+
+  The default configuration for `TelemetryMetricsStatsd` with a single emitter can send several hundred of thousand metrics per
+  second on a single server. That said, this baseline  can be dramatically improved by configuring the library for the specific needs
+  of your application.
+
+  For the UDP emitter, pay attention to the `mtu` and `emitters` keys. In testing, it was found that setting the `mtu` correctly has
+  a dramatic impact on performance. The default value for `emitters` is conservative, it can likely be increased, and our testing
+  indicated that `5` is a reasonable size for the pool. Increasing it beyond this value was found to negatively impact throughput. You
+  are encouraged to experiment and find the values that work for you.
+
+  For the Unix Domain socket emitter, testing indicated that increasing the `emitters` value beyond `2` negatively impacted performance.
+
+
+  ## Metrics
+
+  The following metrics are emitted by `TelemetryMetricsStatsd`
+
+  * `"telemetry_metrics_statsd.congestion.dwell_time.duration"` - Emitted when a dwell time check completes, emits the value of the dwell
+  time, in microseconds.
+  * `"telemetry_metrics_statsd.congestion.emit_percentage.decrease.count"` - Fired each time an emitter reduces its emit percentage.
+  Count is always one per emitter.
+  * `"telemetry_metrics_statsd.congestion.emit_percentage.decrease.value"` - Fired each time an emitter reduces its emit percentage.
+  The value is the new percentage.
+  * `"telemetry_metrics_statsd.congestion.emit_percentage.increase.count"` - Fired each time an emitter increases its emit percentage.
+  Count is always one per emitter.
+  * `"telemetry_metrics_statsd.congestion.emit_percentage.increase.value"` - Fired each time an emitter increases its emit percentage.
+  The value is the new percentage.
+
+
+  """
 
   require Logger
   require Record
 
   alias Telemetry.Metrics
-  alias TelemetryMetricsStatsd.{EventHandler, Options, UDP}
+  alias TelemetryMetricsStatsd.Emitter
+  alias TelemetryMetricsStatsd.EventHandler
+  alias TelemetryMetricsStatsd.Options
 
   @type prefix :: String.t() | atom() | nil
   @type host :: String.t() | :inet.ip_address()
@@ -336,12 +407,6 @@ defmodule TelemetryMetricsStatsd do
           | {:host_resolution_interval, non_neg_integer()}
   @type options :: [option]
 
-  Record.defrecordp(:hostent, Record.extract(:hostent, from_lib: "kernel/include/inet.hrl"))
-
-  # TODO: remove this when we depend on Elixir 1.11+, where Logger.warning/1
-  # was introduced.
-  @log_level_warning if macro_exported?(Logger, :warning, 1), do: :warning, else: :warn
-
   @doc """
   Reporter's child spec.
 
@@ -355,7 +420,8 @@ defmodule TelemetryMetricsStatsd do
   """
   @spec child_spec(options) :: Supervisor.child_spec()
   def child_spec(options) do
-    %{id: __MODULE__, start: {__MODULE__, :start_link, [options]}}
+    name = Keyword.get(options, :name, __MODULE__)
+    %{id: name, start: {__MODULE__, :start_link, [options]}}
   end
 
   @doc """
@@ -382,198 +448,30 @@ defmodule TelemetryMetricsStatsd do
   @spec start_link(options) :: GenServer.on_start()
   def start_link(options) do
     case Options.validate(options) do
-      {:ok, options} ->
-        GenServer.start_link(__MODULE__, options)
+      {:ok, %Options{} = options} ->
+        emitter_module =
+          case options.host do
+            {:local, _path} ->
+              Emitter.Domain
+
+            _ ->
+              Emitter.UDP
+          end
+
+        children = [
+          {PartitionSupervisor,
+           [
+             child_spec: emitter_module.child_spec(options),
+             name: emitter_module.supervisor_name(options.name),
+             partitions: options.emitters
+           ]},
+          {EventHandler.Attach, [options, emitter_module]}
+        ]
+
+        Supervisor.start_link(children, strategy: :one_for_all)
 
       {:error, _} = err ->
         err
     end
-  end
-
-  @doc false
-  @spec get_udp(:ets.tid()) :: {:ok, UDP.t()} | :error
-  def get_udp(pool_id) do
-    # The table can be empty if the UDP error is reported for all the sockets.
-    case :ets.lookup(pool_id, :udp) do
-      [] ->
-        Logger.error("Failed to publish metrics over UDP: no open sockets available.")
-        :error
-
-      udps ->
-        {:udp, udp} = Enum.random(udps)
-        {:ok, udp}
-    end
-  end
-
-  @doc false
-  @spec get_pool_id(pid()) :: :ets.tid()
-  def get_pool_id(reporter) do
-    GenServer.call(reporter, :get_pool_id)
-  end
-
-  @doc false
-  @spec udp_error(pid(), UDP.t(), reason :: term) :: :ok
-  def udp_error(reporter, udp, reason) do
-    GenServer.cast(reporter, {:udp_error, udp, reason})
-  end
-
-  @impl true
-  def init(options) do
-    Process.flag(:trap_exit, true)
-    metrics = Map.fetch!(options, :metrics)
-
-    udp_config =
-      case options.host do
-        {:local, _} = host -> %{host: host}
-        _ -> configure_host_resolution(options)
-      end
-
-    udps =
-      for _ <- 1..options.pool_size do
-        {:ok, udp} = UDP.open(udp_config)
-        {:udp, udp}
-      end
-
-    pool_id = :ets.new(__MODULE__, [:bag, :protected, read_concurrency: true])
-    :ets.insert(pool_id, udps)
-
-    handler_ids =
-      EventHandler.attach(
-        metrics,
-        self(),
-        pool_id,
-        options.mtu,
-        options.prefix,
-        options.formatter,
-        options.global_tags
-      )
-
-    {:ok,
-     %{
-       udp_config: udp_config,
-       handler_ids: handler_ids,
-       pool_id: pool_id,
-       host: options.host,
-       port: options.port,
-       host_resolution_interval: options.host_resolution_interval
-     }}
-  end
-
-  @impl true
-  def handle_cast({:udp_error, old_udp, reason}, %{pool_id: pool_id} = state) do
-    udps = :ets.lookup(pool_id, :udp)
-    old_entry = {:udp, old_udp}
-
-    if Enum.find(udps, fn entry -> entry == old_entry end) do
-      Logger.error("Failed to publish metrics over UDP: #{inspect(reason)}")
-      UDP.close(old_udp)
-      :ets.delete_object(pool_id, old_entry)
-
-      case UDP.open(state.udp_config) do
-        {:ok, udp} ->
-          :ets.insert(pool_id, {:udp, udp})
-          {:noreply, state}
-
-        {:error, reason} ->
-          Logger.error("Failed to reopen UDP socket: #{inspect(reason)}")
-          {:stop, {:udp_open_failed, reason}, state}
-      end
-    else
-      {:noreply, state}
-    end
-  end
-
-  @impl true
-  def handle_call(:get_pool_id, _from, %{pool_id: pool_id} = state) do
-    {:reply, pool_id, state}
-  end
-
-  @impl true
-  def handle_info({:EXIT, _pid, reason}, state) do
-    {:stop, reason, state}
-  end
-
-  @impl true
-  def handle_info(:resolve_host, state) do
-    %{host: host, udp_config: %{host: current_address}, host_resolution_interval: interval} =
-      state
-
-    new_state =
-      case :inet.gethostbyname(host) do
-        {:ok, hostent(h_addr_list: ips)} ->
-          if Enum.member?(ips, current_address) do
-            state
-          else
-            [new_address | _] = ips
-            update_host(state, new_address)
-          end
-
-        {:error, reason} ->
-          Logger.log(
-            @log_level_warning,
-            "Failed to resolve the hostname #{host}: #{inspect(reason)}. " <>
-              "Using the previously resolved address of #{:inet.ntoa(current_address)}."
-          )
-
-          state
-      end
-
-    Process.send_after(self(), :resolve_host, interval)
-
-    {:noreply, new_state}
-  end
-
-  @impl true
-  def terminate(_reason, state) do
-    EventHandler.detach(state.handler_ids)
-
-    :ok
-  end
-
-  defp update_host(state, new_address) do
-    %{pool_id: pool_id, udp_config: %{port: port} = udp_config} = state
-    update_pool(pool_id, new_address, port)
-
-    %{state | udp_config: %{udp_config | host: new_address}}
-  end
-
-  defp configure_host_resolution(%{
-         host: host,
-         port: port,
-         inet_address_family: inet_address_family
-       })
-       when is_tuple(host) do
-    %{host: host, port: port, inet_address_family: inet_address_family}
-  end
-
-  defp configure_host_resolution(%{
-         host: host,
-         port: port,
-         inet_address_family: inet_address_family,
-         host_resolution_interval: interval
-       })
-       when is_integer(interval) do
-    {:ok, hostent(h_addr_list: [ip | _ips])} = :inet.gethostbyname(host, inet_address_family)
-    Process.send_after(self(), :resolve_host, interval)
-    %{host: ip, port: port, inet_address_family: inet_address_family}
-  end
-
-  defp configure_host_resolution(%{
-         host: host,
-         port: port,
-         inet_address_family: inet_address_family
-       }) do
-    {:ok, hostent(h_addr_list: [ip | _ips])} = :inet.gethostbyname(host, inet_address_family)
-    %{host: ip, port: port, inet_address_family: inet_address_family}
-  end
-
-  defp update_pool(pool_id, new_host, new_port) do
-    pool_id
-    |> :ets.tab2list()
-    |> Enum.each(fn {:udp, udp} ->
-      :ets.delete_object(pool_id, {:udp, udp})
-      updated_udp = UDP.update(udp, new_host, new_port)
-      :ets.insert(pool_id, {:udp, updated_udp})
-    end)
   end
 end

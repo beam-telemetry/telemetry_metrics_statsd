@@ -31,7 +31,7 @@ defmodule TelemetryMetricsStatsd.MixProject do
   defp preferred_cli_env do
     [
       docs: :docs,
-      dialyzer: :test,
+      dialyzer: :dev,
       format: :test
     ]
   end
@@ -41,11 +41,12 @@ defmodule TelemetryMetricsStatsd.MixProject do
       {:telemetry, "~> 0.4 or ~> 1.0"},
       {:telemetry_metrics, "~> 0.6 or ~> 1.0"},
       {:nimble_options, "~> 0.4 or ~> 1.0"},
-      {:stream_data, "~> 0.4", only: :test},
-      {:dialyxir, "~> 1.3", only: :test, runtime: false},
-      {:ex_doc, "~> 0.19", only: :docs},
+      {:stream_data, "~> 1.0", only: :test},
+      {:dialyxir, "~> 1.3", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.37", only: :docs},
       {:liveness, "~> 1.0", only: :test},
-      {:mock, "~> 0.3.5", only: :test}
+      {:mock, "~> 0.3.5", only: :test},
+      {:patch, "> 0.0.0", only: :test}
     ]
   end
 

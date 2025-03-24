@@ -28,7 +28,9 @@ defmodule TelemetryMetricsStatsd.Options do
     ],
     socket_path: [
       type: {:custom, __MODULE__, :socket_path, []},
-      doc: "Path to the Unix Domain Socket used for publishing instead of the hostname and port."
+      doc:
+        "Path to the Unix Domain Socket used for publishing instead of the hostname and port. " <>
+          ""
     ],
     formatter: [
       type: {:custom, __MODULE__, :formatter, []},
@@ -47,11 +49,6 @@ defmodule TelemetryMetricsStatsd.Options do
       type: {:or, [:string, :atom]},
       doc: "A prefix added to the name of each metric published by the reporter."
     ],
-    pool_size: [
-      type: :non_neg_integer,
-      default: 10,
-      doc: "A number of UDP sockets used for publishing metrics."
-    ],
     host_resolution_interval: [
       type: :non_neg_integer,
       doc:
@@ -65,6 +62,39 @@ defmodule TelemetryMetricsStatsd.Options do
       doc:
         "Maximum Transmission Unit of the link between your application and the StastD server in bytes. " <>
           "If this value is greater than the actual MTU of the link, UDP packets with published metrics will be dropped."
+    ],
+    flush_timeout: [
+      type: :non_neg_integer,
+      default: 1000,
+      doc:
+        "The maximum amount of time, in milliseconds that a metric can sit in an emitter's buffer before being" <>
+          "written to the socket. Only used by the UDP emitter."
+    ],
+    emitters: [
+      type: :pos_integer,
+      default: 1,
+      doc:
+        "The number of metrics emitters in the pool. Each metric emitter contains either a UDP or Unix Domain Socket."
+    ],
+    max_queue_dwell_time: [
+      type: :pos_integer,
+      doc:
+        "The maximum amount of time, in milliseconds, a message should wait in the emitter's message queue before messages are throttled. " <>
+          "If a probe message waits in the queue longer than `max_queue_dwell_time`, the percentage of " <>
+          "messages emitted is reduced by 50%. The percentage of messages emitted goes up by 1% if a probe message sits in" <>
+          "the queue less than the `max_queue_dwell_time`."
+    ],
+    dwell_time_check_interval: [
+      type: :pos_integer,
+      default: 1000,
+      doc:
+        "The cadence of dwell time checks. If the `max_queue_dwell_time` option is set, the queue is " <>
+          "probed every `dwell_time_check_interval` milliseconds to see if the dwell time is under the value specified."
+    ],
+    name: [
+      default: TelemetryMetricsStatsd,
+      type: :atom,
+      doc: "The registered name of the reporter. "
     ]
   ]
 
