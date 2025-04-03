@@ -65,11 +65,15 @@ defmodule TelemetryMetricsStatsd.Emitter.Congestion do
       duration: observed_dwell_time_micros
     })
 
+    :telemetry.execute([:telemetry_metrics_statsd, :congestion, :emit_percentage], %{
+      value: new_emit_percentage
+    })
+
     cond do
       new_emit_percentage > orig_emit_percentage ->
         :telemetry.execute(
           [:telemetry_metrics_statsd, :congestion, :emit_percentage, :increase],
-          %{count: 1, value: new_emit_percentage}
+          %{count: 1}
         )
 
         Logger.info(
@@ -79,7 +83,7 @@ defmodule TelemetryMetricsStatsd.Emitter.Congestion do
       new_emit_percentage < orig_emit_percentage ->
         :telemetry.execute(
           [:telemetry_metrics_statsd, :congestion, :emit_percentage, :decrease],
-          %{count: 1, value: new_emit_percentage}
+          %{count: 1}
         )
 
         Logger.critical(
