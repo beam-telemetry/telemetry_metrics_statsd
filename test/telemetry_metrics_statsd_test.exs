@@ -631,17 +631,17 @@ defmodule TelemetryMetricsStatsdTest do
       {socket, port} = given_udp_port_opened()
 
       increase =
-        given_last_value("telemetry_metrics_statsd.congestion.emit_percentage.increase.value")
+        given_last_value("telemetry_metrics_statsd.congestion.emit_percentage.increase.count")
 
       decrease =
-        given_last_value("telemetry_metrics_statsd.congestion.emit_percentage.decrease.value")
+        given_last_value("telemetry_metrics_statsd.congestion.emit_percentage.decrease.count")
 
       start_reporter(port: port, metrics: [increase, decrease], max_queue_dwell_time: 50)
 
       eventually(fn ->
         assert_reported(
           socket,
-          "telemetry_metrics_statsd.congestion.emit_percentage.decrease.value:1|g"
+          "telemetry_metrics_statsd.congestion.emit_percentage.decrease.count:1|g"
         )
       end)
 
@@ -650,7 +650,7 @@ defmodule TelemetryMetricsStatsdTest do
       eventually(fn ->
         assert_reported(
           socket,
-          "telemetry_metrics_statsd.congestion.emit_percentage.increase.value:1|g"
+          "telemetry_metrics_statsd.congestion.emit_percentage.increase.count:1|g"
         )
       end)
     end

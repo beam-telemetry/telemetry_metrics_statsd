@@ -3,6 +3,7 @@ defmodule TelemetryMetricsStatsd.Emitter.CongestionTest do
 
   use ExUnit.Case
   use ExUnitProperties
+  use Patch
 
   import ExUnit.CaptureLog
 
@@ -95,6 +96,151 @@ defmodule TelemetryMetricsStatsd.Emitter.CongestionTest do
 
       assert log =~ "[info] Emitter #PID<"
       assert log =~ "raising emit percentage to 91.0%"
+    end
+  end
+
+  describe "metrics" do
+    test "the emit percentage is sent when it stays the same" do
+      patch(:telemetry, :execute, :ok)
+
+      Congestion.calculate_emit_percentage(1.0, 500, 3)
+
+      assert_called(
+        :telemetry.execute(
+          [:telemetry_metrics_statsd, :congestion, :emit_percentage],
+          %{value: 1.0}
+        )
+      )
+    end
+
+    test "the emit percentage is sent when it stays the decreases" do
+      patch(:telemetry, :execute, :ok)
+
+      capture_log(fn ->
+        Congestion.calculate_emit_percentage(1.0, 500, 600)
+      end)
+
+      assert_called(
+        :telemetry.execute(
+          [:telemetry_metrics_statsd, :congestion, :emit_percentage],
+          %{value: 0.5}
+        )
+      )
+    end
+
+    test "the emit percentage is sent when it stays the increases" do
+      patch(:telemetry, :execute, :ok)
+
+      capture_log(fn ->
+        Congestion.calculate_emit_percentage(0.5, 500, 10)
+      end)
+
+      assert_called(
+        :telemetry.execute(
+          [:telemetry_metrics_statsd, :congestion, :emit_percentage],
+          %{value: 0.51}
+        )
+      )
+    end
+
+    test "dwell time is sent when it stays the same" do
+      patch(:telemetry, :execute, :ok)
+
+      Congestion.calculate_emit_percentage(1.0, 500, 3)
+
+      assert_called(
+        :telemetry.execute(
+          [:telemetry_metrics_statsd, :congestion, :dwell_time],
+          %{duration: 3}
+        )
+      )
+    end
+
+    test "dwell time is sent when it stays the decreases" do
+      patch(:telemetry, :execute, :ok)
+
+      capture_log(fn ->
+        Congestion.calculate_emit_percentage(1.0, 500, 600)
+      end)
+
+      assert_called(
+        :telemetry.execute(
+          [:telemetry_metrics_statsd, :congestion, :dwell_time],
+          %{duration: 600}
+        )
+      )
+    end
+
+    test "dwell time is sent when it stays the increases" do
+      patch(:telemetry, :execute, :ok)
+
+      capture_log(fn ->
+        Congestion.calculate_emit_percentage(0.5, 500, 10)
+      end)
+
+      assert_called(
+        :telemetry.execute(
+          [:telemetry_metrics_statsd, :congestion, :dwell_time],
+          %{duration: 10}
+        )
+      )
+    end
+
+    test "no delta metrics are emitted when the emit percentage stays the same" do
+      patch(:telemetry, :execute, :ok)
+
+      1.0 = Congestion.calculate_emit_percentage(1.0, 500, 3)
+
+      refute_called(
+        :telemetry.execute(
+          [:telemetry_metrics_statsd, :congestion, :emit_percentage, :increase],
+          %{value: 1.0}
+        )
+      )
+    end
+
+    test "delta metrics are emitted when the emit percentage decreases" do
+      patch(:telemetry, :execute, :ok)
+
+      capture_log(fn ->
+        0.5 = Congestion.calculate_emit_percentage(1.0, 500, 501)
+      end)
+
+      refute_called(
+        :telemetry.execute(
+          [:telemetry_metrics_statsd, :congestion, :emit_percentage, :increase],
+          %{count: 1}
+        )
+      )
+
+      assert_called(
+        :telemetry.execute(
+          [:telemetry_metrics_statsd, :congestion, :emit_percentage, :decrease],
+          %{count: 1}
+        )
+      )
+    end
+
+    test "delta metrics are emitted when the emit percentage increases" do
+      patch(:telemetry, :execute, :ok)
+
+      capture_log(fn ->
+        0.51 = Congestion.calculate_emit_percentage(0.5, 500, 499)
+      end)
+
+      refute_called(
+        :telemetry.execute(
+          [:telemetry_metrics_statsd, :congestion, :emit_percentage, :decrease],
+          %{count: 1}
+        )
+      )
+
+      assert_called(
+        :telemetry.execute(
+          [:telemetry_metrics_statsd, :congestion, :emit_percentage, :increase],
+          %{count: 1}
+        )
+      )
     end
   end
 end
