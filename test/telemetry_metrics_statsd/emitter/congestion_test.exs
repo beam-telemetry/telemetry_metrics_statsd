@@ -85,7 +85,7 @@ defmodule TelemetryMetricsStatsd.Emitter.CongestionTest do
         end)
 
       assert log =~ "[critical] Dwell time for emitter"
-      assert log =~ "of 1500us exceeds 1000us. Now sampling at 50.0%"
+      assert log =~ "of 1500us exceeds 1000us. Now sampling at 50%"
     end
 
     test "logs are emitted when the emit percentage increases" do
@@ -108,7 +108,7 @@ defmodule TelemetryMetricsStatsd.Emitter.CongestionTest do
       assert_called(
         :telemetry.execute(
           [:telemetry_metrics_statsd, :congestion, :emit_percentage],
-          %{value: 1.0}
+          %{value: 100}
         )
       )
     end
@@ -123,7 +123,7 @@ defmodule TelemetryMetricsStatsd.Emitter.CongestionTest do
       assert_called(
         :telemetry.execute(
           [:telemetry_metrics_statsd, :congestion, :emit_percentage],
-          %{value: 0.5}
+          %{value: 50}
         )
       )
     end
@@ -138,7 +138,7 @@ defmodule TelemetryMetricsStatsd.Emitter.CongestionTest do
       assert_called(
         :telemetry.execute(
           [:telemetry_metrics_statsd, :congestion, :emit_percentage],
-          %{value: 0.51}
+          %{value: 51}
         )
       )
     end

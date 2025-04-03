@@ -130,7 +130,7 @@ defmodule TelemetryMetricsStatsd.Emitter.DomainTest do
         end)
 
       assert log =~ "[critical] Dwell time for emitter"
-      assert log =~ "Now sampling at 50.0%"
+      assert log =~ "Now sampling at 50%"
     end
 
     test "logs an info message when the percentage rises" do

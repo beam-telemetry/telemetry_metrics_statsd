@@ -65,8 +65,10 @@ defmodule TelemetryMetricsStatsd.Emitter.Congestion do
       duration: observed_dwell_time_micros
     })
 
+    new_emit_percentage_integer = round(new_emit_percentage * 100)
+
     :telemetry.execute([:telemetry_metrics_statsd, :congestion, :emit_percentage], %{
-      value: new_emit_percentage
+      value: new_emit_percentage_integer
     })
 
     cond do
@@ -88,7 +90,7 @@ defmodule TelemetryMetricsStatsd.Emitter.Congestion do
 
         Logger.critical(
           "Dwell time for emitter #{inspect(self())} of #{observed_dwell_time_micros}us exceeds #{max_dwell_time_micros}us. " <>
-            "Now sampling at #{new_emit_percentage * 100}%"
+            "Now sampling at #{new_emit_percentage_integer}%"
         )
 
       true ->
