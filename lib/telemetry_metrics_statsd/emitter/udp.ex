@@ -9,7 +9,7 @@ defmodule TelemetryMetricsStatsd.Emitter.UDP do
 
   @dialyzer [{:nowarn_function, append_metric: 2}, :no_improper_lists]
 
-  defrecordp :buffer, size: 0, data: [], created_at: nil
+  defrecordp :buffer, size: 0, data: [], created_at: nil, count: 0
   defrecordp :hostent, extract(:hostent, from_lib: "kernel/include/inet.hrl")
 
   defstruct [
@@ -17,6 +17,7 @@ defmodule TelemetryMetricsStatsd.Emitter.UDP do
     :destination,
     :dwell_time_check_interval,
     :emit_percentage,
+    :emitted_metrics_count,
     :flush_timeout,
     :host,
     :host_resolution_interval,
@@ -60,6 +61,7 @@ defmodule TelemetryMetricsStatsd.Emitter.UDP do
         state
         | dwell_time_check_interval: options.dwell_time_check_interval,
           emit_percentage: 1.0,
+          emitted_metrics_count: 0,
           flush_timeout: options.flush_timeout,
           max_queue_dwell_time_micros: dwell_time_micros,
           mtu: options.mtu
@@ -75,12 +77,12 @@ defmodule TelemetryMetricsStatsd.Emitter.UDP do
   def handle_call({:emit, data}, _from, %__MODULE__{} = state) do
     new_buffer =
       case add_to_buffer(state, data) do
-        {:flush, data_to_flush, new_buffer} ->
-          write_to_socket!(state, data_to_flush)
+        {:flush, buffers, new_buffer} when is_list(buffers) ->
+          Enum.each(buffers, &write_to_socket!(state, &1))
           new_buffer
 
-        {:flush_many, packets, new_buffer} ->
-          Enum.each(packets, &write_to_socket!(state, &1))
+        {:flush, buffer_to_flush, new_buffer} ->
+          write_to_socket!(state, buffer_to_flush)
           new_buffer
 
         {:buffer, buffer} ->
@@ -92,7 +94,7 @@ defmodule TelemetryMetricsStatsd.Emitter.UDP do
 
   @impl true
   def handle_cast({:emit_internal, data}, %__MODULE__{} = state) do
-    write_to_socket!(state, data)
+    write_to_socket!(state, new_buffer(data))
 
     {:noreply, state, adjust_flush_timeout(state)}
   end
@@ -148,8 +150,8 @@ defmodule TelemetryMetricsStatsd.Emitter.UDP do
   end
 
   @impl true
-  def handle_info(:timeout, %__MODULE__{buffer: buffer(data: [_ | _] = metrics)} = state) do
-    write_to_socket!(state, metrics)
+  def handle_info(:timeout, %__MODULE__{buffer: buffer(data: [_ | _]) = buffer} = state) do
+    write_to_socket!(state, buffer)
 
     {:noreply, %__MODULE__{state | buffer: nil}}
   end
@@ -174,7 +176,7 @@ defmodule TelemetryMetricsStatsd.Emitter.UDP do
     %__MODULE__{state | socket: nil}
   end
 
-  defp write_to_socket!(%__MODULE__{} = state, data) do
+  defp write_to_socket!(%__MODULE__{} = state, buffer(data: data)) do
     case :socket.send(state.socket, data) do
       :ok ->
         :ok
@@ -214,42 +216,38 @@ defmodule TelemetryMetricsStatsd.Emitter.UDP do
         {:buffer, state.buffer}
 
       metric_size >= state.mtu ->
-        {:flush, metric_data, nil}
+        {:flush, new_buffer(metric_data), nil}
 
       true ->
-        {:buffer, new_buffer(metric_data, metric_size)}
+        {:buffer, new_buffer(metric_data)}
     end
   end
 
   defp add_to_buffer(%__MODULE__{} = state, metric_data) do
-    buffer(data: data, size: buffer_size) = state.buffer
-
-    # Include 1 byte for the newline
-    total_size = byte_size(metric_data) + buffer_size + 1
+    buffer(size: total_size) = appended_buffer = append_metric(state.buffer, metric_data)
 
     cond do
       not Congestion.should_emit?(state.emit_percentage) ->
         {:buffer, state.buffer}
 
       byte_size(metric_data) >= state.mtu ->
-        {:flush_many, [data, metric_data], nil}
+        {:flush, [state.buffer, new_buffer(metric_data)], nil}
 
       total_size == state.mtu ->
         {:flush, append_metric(state.buffer, metric_data), nil}
 
       total_size > state.mtu ->
-        {to_emit, new_buffer} = flush_remaining_or_incoming(data, metric_data)
+        {to_emit, new_buffer} = flush_remaining_or_incoming(state.buffer, metric_data)
 
         {:flush, to_emit, new_buffer}
 
       exceeded_flush_timeout?(state.buffer, state.flush_timeout) ->
-        {to_emit, new_buffer} = flush_remaining_or_incoming(data, metric_data)
+        {to_emit, new_buffer} = flush_remaining_or_incoming(state.buffer, metric_data)
 
         {:flush, to_emit, new_buffer}
 
       true ->
-        {:buffer,
-         buffer(state.buffer, data: append_metric(state.buffer, metric_data), size: total_size)}
+        {:buffer, appended_buffer}
     end
   end
 
@@ -268,23 +266,26 @@ defmodule TelemetryMetricsStatsd.Emitter.UDP do
     end
   end
 
-  defp append_metric(buffer(data: data), metric_data) do
-    [data, "\n" | metric_data]
+  defp append_metric(buffer(data: data, count: count, size: size) = old_buffer, metric_data) do
+    # Include 1 byte for the newline
+    total_size = size + byte_size(metric_data) + 1
+    buffer(old_buffer, data: [data, "\n" | metric_data], count: count + 1, size: total_size)
   end
 
   defp flush_remaining_or_incoming([], metric_data) do
-    {metric_data, nil}
+    {new_buffer(metric_data), nil}
   end
 
   defp flush_remaining_or_incoming(data, metric_data) do
-    {data, new_buffer(metric_data, byte_size(metric_data))}
+    {data, new_buffer(metric_data)}
   end
 
-  defp new_buffer(data, size) do
+  defp new_buffer(data) do
     buffer(
-      size: size,
+      size: byte_size(data),
       data: List.wrap(data),
-      created_at: System.system_time(:millisecond)
+      created_at: System.system_time(:millisecond),
+      count: 1
     )
   end
 

@@ -55,7 +55,7 @@ defmodule TelemetryMetricsStatsd.Emitter.UdpTest do
 
       emit(emitter, @metric)
 
-      assert_called :socket.send(_, @metric)
+      assert_called :socket.send(_, [@metric])
     end
 
     test "buffers data if under the mtu" do
@@ -74,7 +74,7 @@ defmodule TelemetryMetricsStatsd.Emitter.UdpTest do
       {:ok, emitter} = new_emitter(mtu: byte_size(@metric) - 1)
       emit(emitter, @metric)
 
-      assert_called :socket.send(_, @metric)
+      assert_called :socket.send(_, [@metric])
     end
 
     test "emits all metrics if the old data is below the mtu and the new data is above the mtu" do
@@ -90,7 +90,7 @@ defmodule TelemetryMetricsStatsd.Emitter.UdpTest do
       emit(emitter, over_mtu_metric)
 
       assert_called :socket.send(_, [@metric])
-      assert_called :socket.send(_, ^over_mtu_metric)
+      assert_called :socket.send(_, [^over_mtu_metric])
     end
 
     test "sends data after a timeout" do
