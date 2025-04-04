@@ -75,21 +75,17 @@ defmodule TelemetryMetricsStatsd.Emitter.UDP do
   @behaviour TelemetryMetricsStatsd.Emitter
   @impl GenServer
   def handle_call({:emit, data}, _from, %__MODULE__{} = state) do
-    new_buffer =
+    new_state =
       case add_to_buffer(state, data) do
         {:flush, buffers, new_buffer} when is_list(buffers) ->
           Enum.each(buffers, &write_to_socket!(state, &1))
-          new_buffer
-
-        {:flush, buffer_to_flush, new_buffer} ->
-          write_to_socket!(state, buffer_to_flush)
-          new_buffer
+          %__MODULE__{state | buffer: new_buffer}
 
         {:buffer, buffer} ->
-          buffer
+          %__MODULE__{state | buffer: buffer}
       end
 
-    {:reply, :ok, %__MODULE__{state | buffer: new_buffer}, state.flush_timeout}
+    {:reply, :ok, new_state, state.flush_timeout}
   end
 
   @impl true
@@ -216,7 +212,7 @@ defmodule TelemetryMetricsStatsd.Emitter.UDP do
         {:buffer, state.buffer}
 
       metric_size >= state.mtu ->
-        {:flush, new_buffer(metric_data), nil}
+        {:flush, [new_buffer(metric_data)], nil}
 
       true ->
         {:buffer, new_buffer(metric_data)}
@@ -234,17 +230,17 @@ defmodule TelemetryMetricsStatsd.Emitter.UDP do
         {:flush, [state.buffer, new_buffer(metric_data)], nil}
 
       total_size == state.mtu ->
-        {:flush, append_metric(state.buffer, metric_data), nil}
+        {:flush, [append_metric(state.buffer, metric_data)], nil}
 
       total_size > state.mtu ->
         {to_emit, new_buffer} = flush_remaining_or_incoming(state.buffer, metric_data)
 
-        {:flush, to_emit, new_buffer}
+        {:flush, [to_emit], new_buffer}
 
       exceeded_flush_timeout?(state.buffer, state.flush_timeout) ->
         {to_emit, new_buffer} = flush_remaining_or_incoming(state.buffer, metric_data)
 
-        {:flush, to_emit, new_buffer}
+        {:flush, [to_emit], new_buffer}
 
       true ->
         {:buffer, appended_buffer}
