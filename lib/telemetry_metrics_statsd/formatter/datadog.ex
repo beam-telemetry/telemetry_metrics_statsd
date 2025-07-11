@@ -63,7 +63,14 @@ defmodule TelemetryMetricsStatsd.Formatter.Datadog do
   end
 
   defp format_tag(k, v) do
-    [:erlang.atom_to_binary(k, :utf8), ?:, to_string(v)]
+    [:erlang.atom_to_binary(k, :utf8), ?:, safe_to_string(v)]
+  end
+
+  defp safe_to_string(value) do
+    to_string(value)
+  rescue
+    Protocol.UndefinedError ->
+      "unprocessable"
   end
 
   defp format_sampling_rate(reporter_options) do
