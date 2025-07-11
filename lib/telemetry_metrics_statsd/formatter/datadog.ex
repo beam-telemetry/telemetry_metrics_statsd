@@ -67,10 +67,11 @@ defmodule TelemetryMetricsStatsd.Formatter.Datadog do
   end
 
   defp safe_to_string(value) do
-    to_string(value)
-  rescue
-    Protocol.UndefinedError ->
+    if String.Chars.impl_for(value) do
+      to_string(value)
+    else
       "_unprocessable"
+    end
   end
 
   defp format_sampling_rate(reporter_options) do
