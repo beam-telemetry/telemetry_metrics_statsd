@@ -95,14 +95,14 @@ defmodule TelemetryMetricsStatsd.Formatter.DatadogTest do
     m = given_last_value("my.awesome.metric", tags: [:method, :status])
 
     assert format(m, 131, method: "GET", status: %{code: 200}) ==
-             "my.awesome.metric:131|g|#method:GET,status:unprocessable"
+             "my.awesome.metric:131|g|#method:GET,status:_unprocessable"
   end
 
   test "unprocesable tuple tag values are handled safely" do
     m = given_last_value("my.awesome.metric", tags: [:method, :status])
 
     assert format(m, 131, method: "GET", status: {:ok, 200}) ==
-             "my.awesome.metric:131|g|#method:GET,status:unprocessable"
+             "my.awesome.metric:131|g|#method:GET,status:_unprocessable"
   end
 
   defp format(metric, value, tags) do
