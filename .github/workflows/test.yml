@@ -11,14 +11,14 @@ on:
 jobs:
   format:
     name: Check formatting
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: "26.0"
-          elixir-version: "1.15.4"
-      - uses: actions/cache@v2
+          otp-version: "28"
+          elixir-version: "1.18.4"
+      - uses: actions/cache@v4
         name: Cache dependencies
         with:
           path: |
@@ -32,26 +32,26 @@ jobs:
 
   test:
     name: Test on Elixir ${{ matrix.elixir }} (OTP ${{ matrix.otp }})
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         include:
-          - otp: 24.0
-            elixir: 1.12.0
-          - otp: 24.3
-            elixir: 1.13.4
-          - otp: 25.3
-            elixir: 1.14.5
-          - otp: 26.0
-            elixir: 1.15.4
+          - otp: 25
+            elixir: 1.15.8
+          - otp: 26
+            elixir: 1.16.3
+          - otp: 27
+            elixir: 1.17.3
+          - otp: 28
+            elixir: 1.18.4
     steps:
       - uses: actions/checkout@v2
       - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{ matrix.otp }}
           elixir-version: ${{ matrix.elixir }}
-      - uses: actions/cache@v2
+      - uses: actions/cache@v4
         name: Cache dependencies
         with:
           path: |
@@ -61,7 +61,7 @@ jobs:
             deps-${{ hashFiles('mix.lock') }}
             deps-
       - run: mix deps.get
-      - uses: actions/cache@v2
+      - uses: actions/cache@v4
         name: Cache build
         with:
           path: |
@@ -74,26 +74,26 @@ jobs:
 
   dialyze:
     name: Dialyze on Elixir ${{ matrix.elixir }} (OTP ${{ matrix.otp }})
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         include:
-          - otp: 24.0
-            elixir: 1.12.0
-          - otp: 24.3
-            elixir: 1.13.4
-          - otp: 25.3
-            elixir: 1.14.5
-          - otp: 26.0
-            elixir: 1.15.4
+          - otp: 25
+            elixir: 1.15.8
+          - otp: 26
+            elixir: 1.16.3
+          - otp: 27
+            elixir: 1.17.3
+          - otp: 28
+            elixir: 1.18.4
     steps:
       - uses: actions/checkout@v2
       - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{ matrix.otp }}
           elixir-version: ${{ matrix.elixir }}
-      - uses: actions/cache@v2
+      - uses: actions/cache@v4
         name: Cache dependencies
         with:
           path: |
@@ -103,7 +103,7 @@ jobs:
             deps-${{ hashFiles('mix.lock') }}
             deps-
       - run: mix deps.get
-      - uses: actions/cache@v2
+      - uses: actions/cache@v4
         name: Cache build
         with:
           path: |
