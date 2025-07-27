@@ -91,6 +91,18 @@ defmodule TelemetryMetricsStatsd.Formatter.DatadogTest do
     assert format(m, 131.4, []) == "my.awesome.metric:131.4|g"
   end
 
+  test "report_as: service_check for last_value" do
+    m = given_last_value("my.awesome.metric", reporter_options: [report_as: :service_check])
+
+    assert format(m, 0, []) == "_sc|my.awesome.metric|0"
+  end
+
+  test "report_as: service_check for last_value with tags" do
+    m = given_last_value("my.awesome.metric", reporter_options: [report_as: :service_check])
+
+    assert format(m, 0, [host: "foo", app: "bar"]) == "_sc|my.awesome.metric|0|#host:foo,app:bar"
+  end
+
   defp format(metric, value, tags) do
     Datadog.format(metric, value, tags)
     |> :erlang.iolist_to_binary()
