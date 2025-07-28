@@ -230,6 +230,9 @@ defmodule TelemetryMetricsStatsd do
 
   the metric update packet sent to StatsD would be `db.query.count:1|c|#table:users,operation:select`.
 
+  Tag values that cannot be converted to strings (such as maps, tuples, PIDs, ports, or references)
+  are safely handled by converting them to the string `"_unprocessable"`.
+
   #### Metric types
 
   There is no difference in how the counter and last value metrics are handled between
