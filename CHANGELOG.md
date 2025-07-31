@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2](https://github.com/beam-telemetry/telemetry_metrics_statsd/tree/v0.7.2)
+
+
+#### Fixed
+
+- Handle tag values that don't implement `String.Chars` protocol. (#106) @studzien
+
 ## [0.7.1](https://github.com/beam-telemetry/telemetry_metrics_statsd/tree/v0.7.1)
 
 #### Added
