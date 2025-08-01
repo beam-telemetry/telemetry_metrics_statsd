@@ -2,34 +2,41 @@ defmodule TelemetryMetricsStatsd.EventHandler do
   @moduledoc false
 
   alias Telemetry.Metrics
-  alias TelemetryMetricsStatsd.{Formatter, Packet, UDP}
+  alias TelemetryMetricsStatsd.Formatter
+
+  alias TelemetryMetricsStatsd.Options
+  use GenServer
+
+  # Public
+
+  def start_link([options, emitter_module]) do
+    GenServer.start_link(__MODULE__, [options, emitter_module])
+  end
 
   @spec attach(
+          GenServer.name(),
           [Metrics.t()],
-          reporter :: pid(),
-          pool_id :: :ets.tid(),
-          mtu :: non_neg_integer(),
+          emitter_module :: module(),
           prefix :: String.t() | nil,
           formatter :: Formatter.t(),
           global_tags :: Keyword.t()
         ) :: [
           :telemetry.handler_id()
         ]
-  def attach(metrics, reporter, pool_id, mtu, prefix, formatter, global_tags) do
+  def attach(registered_name, metrics, emitter_module, prefix, formatter, global_tags) do
     metrics_by_event = Enum.group_by(metrics, & &1.event_name)
 
     for {event_name, metrics} <- metrics_by_event do
-      handler_id = handler_id(event_name, reporter)
+      handler_id = handler_id(registered_name, event_name, emitter_module)
 
       :ok =
         :telemetry.attach(handler_id, event_name, &__MODULE__.handle_event/4, %{
-          reporter: reporter,
-          pool_id: pool_id,
-          metrics: metrics,
-          mtu: mtu,
-          prefix: prefix,
+          emitter_module: emitter_module,
           formatter: formatter,
-          global_tags: global_tags
+          global_tags: global_tags,
+          metrics: metrics,
+          name: registered_name,
+          prefix: prefix
         })
 
       handler_id
@@ -38,51 +45,76 @@ defmodule TelemetryMetricsStatsd.EventHandler do
 
   @spec detach([:telemetry.handler_id()]) :: :ok
   def detach(handler_ids) do
-    for handler_id <- handler_ids do
-      :telemetry.detach(handler_id)
-    end
-
-    :ok
+    Enum.each(handler_ids, &:telemetry.detach/1)
   end
 
-  def handle_event(_event, measurements, metadata, %{
-        reporter: reporter,
-        pool_id: pool_id,
-        metrics: metrics,
-        mtu: mtu,
-        prefix: prefix,
+  def handle_event(event, measurements, metadata, %{
+        emitter_module: emitter_module,
         formatter: formatter_mod,
-        global_tags: global_tags
+        global_tags: global_tags,
+        metrics: metrics,
+        name: name,
+        prefix: prefix
       }) do
-    packets =
-      for metric <- metrics do
-        if value = keep?(metric, metadata) && fetch_measurement(metric, measurements, metadata) do
-          # The order of tags needs to be preserved so that the final metric name is built correctly.
-          tag_values =
-            global_tags
-            |> Map.new()
-            |> Map.merge(metric.tag_values.(metadata))
+    metrics =
+      for metric <- metrics,
+          keep?(metric, metadata),
+          value = fetch_measurement(metric, measurements, metadata),
+          value != nil do
+        # The order of tags needs to be preserved so that the final metric name is built correctly.
+        tag_values =
+          global_tags
+          |> Map.new()
+          |> Map.merge(metric.tag_values.(metadata))
 
-          tags = Enum.map(metric.tags, &{&1, Map.get(tag_values, &1, "")})
-          Formatter.format(formatter_mod, metric, prefix, value, tags)
-        else
-          :nopublish
-        end
+        tags = Enum.map(metric.tags, &{&1, Map.get(tag_values, &1, "")})
+        Formatter.format(formatter_mod, metric, prefix, value, tags)
       end
-      |> Enum.filter(fn l -> l != :nopublish end)
 
-    case packets do
-      [] ->
-        :ok
-
-      packets ->
-        publish_metrics(reporter, pool_id, Packet.build_packets(packets, mtu, "\n"))
+    if internal?(event) do
+      publish_internal_metrics(emitter_module, name, metrics)
+    else
+      publish_metrics(emitter_module, name, metrics)
     end
   end
 
-  @spec handler_id(:telemetry.event_name(), reporter :: pid) :: :telemetry.handler_id()
-  defp handler_id(event_name, reporter) do
-    {__MODULE__, reporter, event_name}
+  # OTP
+  @impl true
+  def init([%Options{} = options, emitter_module]) do
+    Process.flag(:trap_exit, true)
+
+    handler_ids =
+      attach(
+        options.name,
+        options.metrics,
+        emitter_module,
+        options.prefix,
+        options.formatter,
+        options.global_tags
+      )
+
+    {:ok, handler_ids}
+  end
+
+  @impl true
+  def handle_info({:EXIT, _pid, reason}, handler_ids) do
+    {:stop, reason, handler_ids}
+  end
+
+  @impl true
+  def terminate(_reason, handler_ids) do
+    detach(handler_ids)
+  end
+
+  # Private
+
+  @spec handler_id(
+          registered_name :: GenServer.name(),
+          :telemetry.event_name(),
+          emitter_module :: module()
+        ) :: :telemetry.handler_id()
+  defp handler_id(registered_name, event_name, emitter_module) do
+    {__MODULE__, registered_name, emitter_module, event_name}
   end
 
   @spec keep?(Metrics.t(), :telemetry.event_metadata()) :: boolean()
@@ -125,24 +157,20 @@ defmodule TelemetryMetricsStatsd.EventHandler do
     end
   end
 
-  @spec publish_metrics(pid(), :ets.tid(), [binary()]) :: :ok
-  defp publish_metrics(reporter, pool_id, packets) do
-    case TelemetryMetricsStatsd.get_udp(pool_id) do
-      {:ok, udp} ->
-        Enum.reduce_while(packets, :cont, fn packet, :cont ->
-          case UDP.send(udp, packet) do
-            :ok ->
-              {:cont, :cont}
+  defp internal?([:telemetry_metrics_statsd | _]), do: true
+  defp internal?(_), do: false
 
-            {:error, reason} ->
-              TelemetryMetricsStatsd.udp_error(reporter, udp, reason)
-              {:halt, :halt}
-          end
-        end)
+  @spec publish_metrics(emitter_module :: module(), name :: GenServer.name(), [binary()]) :: :ok
+  defp publish_metrics(_emitter_module, _name, []), do: :ok
 
-      :error ->
-        :ok
-    end
+  defp publish_metrics(emitter_module, name, metrics) do
+    Enum.each(metrics, fn metric -> emitter_module.emit(name, metric) end)
+  end
+
+  defp publish_internal_metrics(_emitter_module, _name, []), do: :ok
+
+  defp publish_internal_metrics(emitter_module, name, metrics) do
+    Enum.each(metrics, fn metric -> emitter_module.emit_internal(name, metric) end)
   end
 
   @spec sample(Metrics.t()) :: Metrics.measurement() | nil

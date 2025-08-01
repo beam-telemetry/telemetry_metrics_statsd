@@ -1,5 +1,5 @@
 # Used by "mix format"
 [
   inputs: ["{mix,.formatter}.exs", "{config,lib,test}/**/*.{ex,exs}"],
-  import_deps: [:stream_data]
+  import_deps: [:patch, :stream_data]
 ]
