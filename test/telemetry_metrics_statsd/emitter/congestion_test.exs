@@ -28,16 +28,19 @@ defmodule TelemetryMetricsStatsd.Emitter.CongestionTest do
     end
 
     test "it reduces the percentage if the observed dwell time is above the max" do
-      check all max_dwell_time <- integer(1..5000),
+      check all initial_percentage <- float(min: 0.1, max: 1.0),
+                max_dwell_time <- integer(1..5000),
                 observed_dwell_time_millis <- integer(max_dwell_time..10_000) do
         observed_dwell_time_micros = observed_dwell_time_millis * 1000
 
-        assert 0.5 ==
-                 Congestion.calculate_emit_percentage(
-                   1.0,
-                   max_dwell_time,
-                   observed_dwell_time_micros
-                 )
+        emit_percentage =
+          Congestion.calculate_emit_percentage(
+            initial_percentage,
+            max_dwell_time,
+            observed_dwell_time_micros
+          )
+
+        assert emit_percentage == initial_percentage * 0.5
       end
     end
 
@@ -45,11 +48,14 @@ defmodule TelemetryMetricsStatsd.Emitter.CongestionTest do
       check all initial_emit_percentage <- float(min: 0.001, max: 0.9),
                 max_dwell_time <- integer(1..5000),
                 observed_dwell_time <- integer(0..max_dwell_time) do
-        assert Congestion.calculate_emit_percentage(
-                 initial_emit_percentage,
-                 max_dwell_time,
-                 observed_dwell_time
-               ) > initial_emit_percentage
+        emit_percentage =
+          Congestion.calculate_emit_percentage(
+            initial_emit_percentage,
+            max_dwell_time,
+            observed_dwell_time
+          )
+
+        assert emit_percentage == initial_emit_percentage + 0.01
       end
     end
 

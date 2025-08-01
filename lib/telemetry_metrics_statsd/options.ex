@@ -28,9 +28,7 @@ defmodule TelemetryMetricsStatsd.Options do
     ],
     socket_path: [
       type: {:custom, __MODULE__, :socket_path, []},
-      doc:
-        "Path to the Unix Domain Socket used for publishing instead of the hostname and port. " <>
-          ""
+      doc: "Path to the Unix Domain Socket used for publishing instead of the hostname and port. "
     ],
     formatter: [
       type: {:custom, __MODULE__, :formatter, []},

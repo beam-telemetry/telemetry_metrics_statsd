@@ -47,8 +47,6 @@ defmodule TelemetryMetricsStatsd.Emitter.DomainTest do
 
   describe "emitting metrics" do
     test "metrics are sent immediately" do
-      patch(:socket, :send, :ok)
-
       {:ok, emitter} = new_emitter(mtu: 0)
 
       emit(emitter, @metric)

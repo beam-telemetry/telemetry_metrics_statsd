@@ -230,7 +230,7 @@ defmodule TelemetryMetricsStatsd.Emitter.UDP do
         {:flush, [state.buffer, new_buffer(metric_data)], nil}
 
       total_size == state.mtu ->
-        {:flush, [append_metric(state.buffer, metric_data)], nil}
+        {:flush, [appended_buffer], nil}
 
       total_size > state.mtu ->
         {to_emit, new_buffer} = flush_remaining_or_incoming(state.buffer, metric_data)
@@ -266,10 +266,6 @@ defmodule TelemetryMetricsStatsd.Emitter.UDP do
     # Include 1 byte for the newline
     total_size = size + byte_size(metric_data) + 1
     buffer(old_buffer, data: [data, "\n" | metric_data], count: count + 1, size: total_size)
-  end
-
-  defp flush_remaining_or_incoming([], metric_data) do
-    {new_buffer(metric_data), nil}
   end
 
   defp flush_remaining_or_incoming(data, metric_data) do

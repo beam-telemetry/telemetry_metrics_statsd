@@ -573,7 +573,7 @@ defmodule TelemetryMetricsStatsdTest do
 
   use Patch
 
-  describe "internal events" do
+  describe "internal metrics" do
     setup do
       initial_level = Logger.level()
       Logger.configure(level: :none)

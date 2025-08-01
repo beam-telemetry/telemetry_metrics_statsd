@@ -24,7 +24,6 @@ defmodule TelemetryMetricsStatsd.Emitter.Congestion do
 
   @doc """
   Returns true if the metric should be emitted
-  end
   """
   @spec should_emit?(emit_percentage) :: boolean()
   def should_emit?(emit_percentage) do
@@ -47,18 +46,13 @@ defmodule TelemetryMetricsStatsd.Emitter.Congestion do
     # we arrive at an optimal value for the dwell time
 
     new_emit_percentage =
-      cond do
-        observed_dwell_time_micros > max_dwell_time_micros ->
-          max(
-            orig_emit_percentage * (1 - @emit_percentage_decrement),
-            @minumum_emit_percentage
-          )
-
-        observed_dwell_time_micros <= max_dwell_time_micros ->
-          min(orig_emit_percentage + @emit_percentage_increment, 1.0)
-
-        true ->
-          orig_emit_percentage
+      if observed_dwell_time_micros > max_dwell_time_micros do
+        max(
+          orig_emit_percentage * (1 - @emit_percentage_decrement),
+          @minumum_emit_percentage
+        )
+      else
+        min(orig_emit_percentage + @emit_percentage_increment, 1.0)
       end
 
     :telemetry.execute([:telemetry_metrics_statsd, :congestion, :dwell_time], %{

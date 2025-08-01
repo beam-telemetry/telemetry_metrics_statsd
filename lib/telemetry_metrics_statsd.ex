@@ -287,10 +287,15 @@ defmodule TelemetryMetricsStatsd do
 
   ## Maximum datagram size
 
-  By default, metrics are sent to StatsD over UDP, so it's important that the size of the datagram does not
-  exceed the Maximum Transmission Unit, or MTU, of the link, so that no data is lost on the way.
+  This section is only relevant for metrics sent over UDP, which is the default. The following is
+  not relevant if you're using the Unix Domain Socket emitter.
+
+  When metrics are sent to StatsD over UDP, it's important that the size of the datagram does not
+  exceed the Maximum Transmission Unit (MTU), of the link, so that no data is lost on the way.
   By default the reporter will break up the datagrams at 512 bytes, but this is configurable via
-  the `:mtu` option. Properly setting the MTU will have a drastic impact on performance.
+  the `:mtu` option. Properly setting the MTU will have a drastic impact on performance. To set this field,
+  look at your network's MTU, then subtract a UDP packet's overhead (at least 28 bytes for IPv4 and 48 bytes
+  for IPv6).
 
   ## Sampling data
 
@@ -465,7 +470,7 @@ defmodule TelemetryMetricsStatsd do
              name: emitter_module.supervisor_name(options.name),
              partitions: options.emitters
            ]},
-          {EventHandler.Attach, [options, emitter_module]}
+          {EventHandler, [options, emitter_module]}
         ]
 
         Supervisor.start_link(children, strategy: :one_for_all)
