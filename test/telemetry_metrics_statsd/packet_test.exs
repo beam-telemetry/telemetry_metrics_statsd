@@ -8,7 +8,7 @@ defmodule TelemetryMetricsStatsd.PacketTest do
     check all max_packet_size <- positive_integer(),
               # We should consider empty binaries in general case, but let's ignore them since we
               # know that we won't be using the in the case of StatsD packets.
-              binaries <- list_of(binary(min_length: 1, max_length: max_packet_size)),
+              binaries <- list_of(binary(min_length: 1)),
               joiner <- binary() do
       packets = Packet.build_packets(binaries, max_packet_size, joiner)
 
