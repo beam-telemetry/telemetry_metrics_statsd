@@ -190,6 +190,33 @@ defmodule TelemetryMetricsStatsd.Emitter.UdpTest do
         assert {:einval, _} = catch_exit(emit(emitter, @metric))
       end)
     end
+
+    test "large metrics emit a warning" do
+      {:ok, socket_emitter} = new_socket_emitter(mtu: 10)
+
+      assert capture_log(fn ->
+               emit(socket_emitter, @metric)
+             end) =~ "Metric data exceeds MTU of 10: #{@metric}"
+
+      # Ensure the metric is sent
+      assert [@metric] = receive_metrics(socket_emitter)
+    end
+
+    test "large metrics after small metrics emit a warning" do
+      above_mtu = "#{@metric} #{@metric}"
+      {:ok, socket_emitter} = new_socket_emitter(mtu: byte_size(above_mtu) - 1)
+
+      assert capture_log(fn ->
+               emit(socket_emitter, @metric)
+             end) == ""
+
+      assert capture_log(fn -> emit(socket_emitter, above_mtu) end) =~
+               "Metric data exceeds MTU of 22"
+
+      # Ensure both metrics are sent
+      assert [@metric] = receive_metrics(socket_emitter)
+      assert [^above_mtu] = receive_metrics(socket_emitter)
+    end
   end
 
   describe "hostname resolution" do

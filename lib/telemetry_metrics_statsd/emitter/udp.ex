@@ -230,6 +230,8 @@ defmodule TelemetryMetricsStatsd.Emitter.UDP do
         {:buffer, state.buffer}
 
       metric_size >= state.mtu ->
+        log_metric_over_mtu(metric_data, state.mtu)
+
         {:flush, [new_buffer(metric_data)], nil}
 
       true ->
@@ -245,6 +247,8 @@ defmodule TelemetryMetricsStatsd.Emitter.UDP do
         {:buffer, state.buffer}
 
       byte_size(metric_data) >= state.mtu ->
+        log_metric_over_mtu(metric_data, state.mtu)
+
         {:flush, [state.buffer, new_buffer(metric_data)], nil}
 
       total_size == state.mtu ->
@@ -366,5 +370,11 @@ defmodule TelemetryMetricsStatsd.Emitter.UDP do
   defp socket_options(%__MODULE__{} = state) do
     {ip_address, port} = state.destination
     %{family: state.inet_address_family, port: port, addr: ip_address}
+  end
+
+  defp log_metric_over_mtu(metric_data, mtu) do
+    if byte_size(metric_data) > mtu do
+      Logger.warning("Metric data exceeds MTU of #{mtu}: #{metric_data}")
+    end
   end
 end

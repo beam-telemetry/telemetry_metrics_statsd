@@ -1,5 +1,7 @@
 defmodule TelemetryMetricsStatsdTest do
-  use ExUnit.Case, async: true
+  # async is false because tests modify logger's
+  # global state.
+  use ExUnit.Case, async: false
 
   alias TelemetryMetricsStatsd.Emitter
 

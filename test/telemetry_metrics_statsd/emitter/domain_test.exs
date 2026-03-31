@@ -70,6 +70,8 @@ defmodule TelemetryMetricsStatsd.Emitter.DomainTest do
 
   describe "congestion control" do
     setup do
+      original_level = Logger.level()
+      on_exit(fn -> Logger.configure(level: original_level) end)
       Logger.configure(level: :none)
       :ok
     end
